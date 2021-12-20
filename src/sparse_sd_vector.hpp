@@ -5,9 +5,7 @@
 #ifndef INCLUDED_SPARSE_SD_VECTOR_HPP
 #define INCLUDED_SPARSE_SD_VECTOR_HPP
 
-#include <vector>
-#include <sdsl/sd_vector.hpp>
-#include <sdsl/int_vector.hpp>
+#include "definitions.hpp"
 
 #ifndef ulint
 typedef uint64_t ulint;
