@@ -4,6 +4,18 @@ project(br-index CXX)
 
 find_package(Git QUIET)
 
+SET(SDSL_INCLUDE "~/sdsl/include") #SDSL headeres
+SET(SDSL_LIB "~/sdsl/lib") #SDSL lib
+
+include_directories(SDSL_INCLUDE) 
+link_directories(SDSL_LIB) 
+
+set(CMAKE_CXX_FLAGS "--std=c++11")
+
+set(CMAKE_CXX_FLAGS_DEBUG "-O0 -ggdb -g")
+set(CMAKE_CXX_FLAGS_RELEASE "-g -ggdb -Ofast -fstrict-aliasing -DNDEBUG -march=native")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-g -ggdb -Ofast -fstrict-aliasing -march=native")
+
 # Gitがインストールされており、トップディレクトリに.gitディレクトリがある
 if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
     enable_testing()
@@ -24,6 +36,6 @@ if(NOT EXISTS "${PROJECT_SOURCE_DIR}/external/googletest/CMakeLists.txt")
 message(FATAL_ERROR "The submodules were not downloaded! GOOGLETEST was turned off or failed. Please update submodules and try again.")
 endif()
 
-
 add_subdirectory(src)
 add_subdirectory(external)
+add_subdirectory(test)
