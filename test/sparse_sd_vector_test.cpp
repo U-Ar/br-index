@@ -9,7 +9,9 @@ TEST(SparseSdVectorTest, AllZero) {
     for (size_t i = 0; i < bv.size(); ++i)
     {
         EXPECT_EQ(0,bv[i]);
+        EXPECT_EQ(0,bv.rank(i));
     }
+    EXPECT_EQ(0,bv.number_of_1());
 }
 
 TEST(SparseSdVectorTest, AllOne) {
@@ -19,5 +21,7 @@ TEST(SparseSdVectorTest, AllOne) {
     for (size_t i = 0; i < bv.size(); ++i)
     {
         EXPECT_EQ(1,bv[i]);
+        EXPECT_EQ(i,bv.rank(i));
+        EXPECT_EQ(i,bv.select(i));
     }
 }

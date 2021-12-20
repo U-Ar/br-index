@@ -6,6 +6,8 @@
 #define INCLUDED_SPARSE_SD_VECTOR_HPP
 
 #include <vector>
+#include <sdsl/sd_vector.hpp>
+#include <sdsl/int_vector.hpp>
 
 #ifndef ulint
 typedef uint64_t ulint;
@@ -34,7 +36,7 @@ public:
 
         u = b.size();
 
-        bit_vector bv(b.size());
+        sdsl::bit_vector bv(b.size());
         for (size_t i = 0; i < b.size(); ++i) bv[i] = b[i];
 
         sdv = sdsl::sd_vector<>(bv);
@@ -46,7 +48,7 @@ public:
     /*
      * constructor. build using bit_vector
      */
-    sparse_sd_vector(bit_vector& bv)
+    sparse_sd_vector(sdsl::bit_vector& bv)
     {
         sdv = sdsl::sd_vector<>(bv);
         rank1 = sdsl::sd_vector<>::rank_1_type(&sdv);
@@ -56,7 +58,7 @@ public:
     /*
      * substitution operator.
      */
-    sparse_sd_vector& operator=(const sparse_sd_vector& other)
+    sparse_sd_vector& operator=(sparse_sd_vector& other)
     {
         u = other.size();
         sdv = sdsl::sd_vector<>(other.raw_vector());
@@ -64,7 +66,7 @@ public:
         select1 = sdsl::sd_vector<>::select_1_type(&sdv);
     }
 
-    sd_vector<>& raw_vector()
+    sdsl::sd_vector<>& raw_vector()
     {
         return sdv;
     }
