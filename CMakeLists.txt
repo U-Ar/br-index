@@ -1,35 +1,29 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.16)
 
-project(test_cmake CXX)
+project(br-index CXX)
 
-# download GoogleTest
-include(FetchContent)
-FetchContent_Declare(
-  googletest
-  URL https://github.com/google/googletest/archive/refs/tags/release-1.11.0.zip
-)
+find_package(Git QUIET)
 
-# turn off nonnecessary cache of Google Test
-#set(BUILD_GMOCK CACHE BOOL OFF "" FORCE)
-#set(INSTALL_GTEST CACHE BOOL OFF "" FORCE)
-
-# prevent from overwriting settings of compiler and linker in super project (only in Windows)
-if(WIN32)
-  set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+# Gitがインストールされており、トップディレクトリに.gitディレクトリがある
+if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
+    enable_testing()
+    option(GOOGLETEST "Check Google Test during build" ON)
+    # -DGOOGLETEST=onオプションを付けて実行したらsubmoduleを最新版にする
+    if(GOOGLETEST)
+        message(STATUS "Submodule update")
+        execute_process(COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive
+                        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                        RESULT_VARIABLE GIT_SUBMOD_RESULT)
+        if(NOT GIT_SUBMOD_RESULT EQUAL "0")
+            message(FATAL_ERROR "git submodule update --init failed with ${GIT_SUBMOD_RESULT}, please checkout submodules")
+        endif()
+    endif()
 endif()
 
-# make GoogleTest available
-FetchContent_MakeAvailable(googletest)
-
-enable_testing()
-
-# define unit tests
-add_executable(mytest mytest.cpp)
-target_link_libraries(mytest gtest_main)
-add_test(NAME mytest COMMAND mytest)
-
-# register unit tests to CTest
-include(GoogleTest)
-gtest_discover_tests(mytest)
+if(NOT EXISTS "${PROJECT_SOURCE_DIR}/external/googletest/CMakeLists.txt")
+message(FATAL_ERROR "The submodules were not downloaded! GOOGLETEST was turned off or failed. Please update submodules and try again.")
+endif()
 
 
+add_subdirectory(src)
+add_subdirectory(external)
