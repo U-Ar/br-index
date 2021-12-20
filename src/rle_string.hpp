@@ -49,12 +49,64 @@ public:
         n = input.size();
         r = 0;
 
+        auto runs_per_letter_bv = std::vector<std::vector<bool> >(256);
+
         std::vector<bool> runs_bv;
         std::string run_heads_s;
 
         uchar last_c = input[0];
 
+        for (ulint i = 1; i < input.size(); ++i)
+        {
+            if ((uchar)input[i] != last_c)
+            {
+                run_heads_s.push_back(last_c);
+                runs_per_letter_bv[last_c].push_back(true);
+
+                last_c = input[i];
+
+                // push back a bit set only at the end of a block
+                runs_bv.push_back(r%B == B-1);
+
+                r++;
+
+            } else {
+
+                runs_bv.push_back(false);
+                runs_per_letter_bv[last_c].push_back(false);
+
+            }
+
+            run_heads_s.push_back(last_c);
+            runs_per_letter_bv[last_c].push_back(true);
+            runs_bv.push_back(false);
+            r++;
+
+            assert(run_heads_s.size()==r);
+		    assert(r==count_runs(input));
+            assert(runs_bv.size()==input.size());
+
+            ulint t = 0;
+            for (ulint i = 0; i < 256; ++i) t += runs_per_letter_bv[i].size();
+            assert(t == input.size());
+
+            runs = sparse_bitvector_t(runs_bv);
+            runs_per_letter = std::vector<sparse_bitvector_t>(256);
+            for (ulint i = 0; i < 256; ++i)
+                runs_per_letter[i] = sparse_bitvector_t(runs_per_letter_bv[i]);
+            
+            run_heads = string_t(run_heads_s);
+
+            assert(run_heads.size() == r);
+
+        }
+
         //WIP
+        uchar operator[](ulint i)
+        {
+            assert(i < n);
+            return run_heads[run_of(i).first];
+        }
     }
 
 private:
