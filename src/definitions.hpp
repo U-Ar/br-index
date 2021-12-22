@@ -1,6 +1,7 @@
 #ifndef INCLUDED_DEFINITIONS_HPP
 #define INCLUDED_DEFINITIONS_HPP
 
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <string>

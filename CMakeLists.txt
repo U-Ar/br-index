@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.0)
 
 project(br-index CXX)
 
@@ -16,11 +16,11 @@ set(CMAKE_CXX_FLAGS_DEBUG "-O0 -ggdb -g")
 set(CMAKE_CXX_FLAGS_RELEASE "-g -ggdb -Ofast -fstrict-aliasing -DNDEBUG -march=native")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-g -ggdb -Ofast -fstrict-aliasing -march=native")
 
-# Gitがインストールされており、トップディレクトリに.gitディレクトリがある
+# Git is installed and .git exists in the top directory
 if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
     enable_testing()
     option(GOOGLETEST "Check Google Test during build" ON)
-    # -DGOOGLETEST=onオプションを付けて実行したらsubmoduleを最新版にする
+    # update submodule if option "-DGOOGLETEST=on" is designated
     if(GOOGLETEST)
         message(STATUS "Submodule update")
         execute_process(COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive

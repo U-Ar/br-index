@@ -341,7 +341,7 @@ public:
             std::cout << "run heads: " << bytesize << " bytes" << std::endl;
 
             return tot_bytes;
-            
+
         }
 
 
@@ -421,8 +421,9 @@ private:
 
 };
 
-};
+typedef rle_string<sparse_sd_vector> rle_string_sd;
 
+};
 
 
 #endif
