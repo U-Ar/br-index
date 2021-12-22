@@ -22,11 +22,141 @@ class br_index {
 
 public:
 
-    br_index(){}
+    using triple = std::tuple<range_t, ulint, ulint>;
+
+    br_index() {}
 
     br_index(std::string& input, bool sais = true)
     {
+
+        this->sais = sais;
+
+        if (contains_reserved_chars(input))
+        {
+
+            std::cout << "Error: input string contains one of the reserved characters 0x, 0x1" << std::endl;
+            exit(1);
+        
+        }
+
+        std::cout << "Text length = " << input.size() << std::endl << std::endl;
+
+        std::cout << "(1/3) Building BWT, BWT^R and computing SA samples";
+        if (sais) std::cout << " (SA-SAIS) ... " << std::flush;
+        else std::cout << " (DIVSUFSORT) ... " << std::flush;
+
+        // build RLBWT
+
+        auto bwt_and_samples = sufsort(input);
+
+        std::reverse(input.begin(),input.end());
+        auto bwt_and_samplesR = sufsort(input);
+
+        std::string& bwt_s = std::get<0>(bwt_and_samples);
+        std::vector<std::pair<ulint,ulint> >& samples_first_vec = std::get<1>(bwt_and_samples);
+        std::vector<ulint>& samples_last_vec = std::get<2>(bwt_and_samples);
+
+        std::string& bwt_sR = std::get<0>(bwt_and_samplesR);
+        std::vector<std::pair<ulint,ulint> >& samples_first_vecR = std::get<1>(bwt_and_samplesR);
+        std::vector<ulint>& samples_last_vecR = std::get<2>(bwt_and_samplesR);
+
+        std::cout << "done.\n(2/3) Run length encoding BWT ... " << std::flush;
+
+
+
+        bwt = rle_string_t(bwt_s);
+        bwtR = rle_string_t(bwt_sR);
+
+        // build F column
+        F = std::vector<ulint>(256,0);
+
+        for (uchar c : bwt_s) 
+            F[c]++;
+
+        for (ulint i = 255; i > 0; --i) 
+            F[i] = F[i-1];
+
+        F[0] = 0;
+
+        for(ulint i = 1; i < 256; ++i) 
+            F[i] += F[i-1];
+
+		for(ulint i = 0; i < bwt_s.size(); ++i)
+			if(bwt_s[i]==TERMINATOR)
+				terminator_position = i;
+        
+        for(ulint i = 0; i < bwt_sR.size(); ++i)
+			if(bwt_sR[i]==TERMINATOR)
+				terminator_positionR = i;
+
+        assert(input.size() + 1 == bwt.size());
+
+        std::cout << "done." << std::endl << std::endl;
+
+
+
+        r = bwt.number_of_runs();
+        rR = bwtR.number_of_runs();
+
+        assert(samples_first_vec.size() == r);
+        assert(samples_last_vec.size() == r);
+
+        assert(samples_first_vecR.size() == rR);
+        assert(samples_last_vecR.size() == rR);
+
+        std::cout << "Number of BWT equal-letter runs: r = " << r << std::endl;
+		std::cout << "Rate n/r = " << double(bwt.size())/r << std::endl;
+		std::cout << "log2(r) = " << std::log2(double(r)) << std::endl;
+		std::cout << "log2(n/r) = " << std::log2(double(bwt.size())/r) << std::endl << std::endl;
+
+        std::cout << "Number of BWT^R equal-letter runs: rR = " << rR << std::endl << std::endl;
+
+        // sort samples of first positions in runs according to text position
+        std::sort(samples_first_vec.begin(), samples_first_vec.end());
+
+        // build Elias-Fano predecessor
+        {
+            auto pred_bv = std::vector<bool>(bwt_s.size(),false);
+            for (auto p: samples_first_vec)
+            {
+                assert(p.first < pred_bv.size());
+                pred_bv[p.first] = true;
+            }
+            pred = sparse_bitvector_t(pred_bv);
+        }
+        {
+            auto pred_bvR = std::vector<bool>(bwt_sR.size(),false);
+            for (auto p: samples_first_vecR)
+            {
+                assert(p.first < pred_bvR.size());
+                pred_bvR[p.first] = true;
+            }
+            predR = sparse_bitvector_t(pred_bvR);
+        }
+
+        assert(pred.rank(pred.size()) == r);
+        assert(pred[pred.size()-1]);
+        assert(predR.rank(predR.size()) == rR);
+        assert(predR[predR.size()-1]);
+
+        samples_last = int_vector<>()
+
+
+
+
+
+
+
+
+
+
+        
+
+
+        std::cout << " done. " << std::endl << std::endl;
+
         // TODO
+
     }
 
     /*
@@ -53,9 +183,9 @@ public:
 
         if (c_inside == 0) return {1,0};
 
-        ulint left = F[c] + c_before;
+        ulint lb = F[c] + c_before;
 
-        return {left, left + c_inside - 1};
+        return {lb, lb + c_inside - 1};
     
     }
 
@@ -75,9 +205,9 @@ public:
 
         if (c_inside == 0) return {1,0};
 
-        ulint left = F[c] + c_before;
+        ulint lb = F[c] + c_before;
 
-        return {left, left + c_inside - 1};
+        return {lb, lb + c_inside - 1};
 
     }
 
@@ -161,12 +291,12 @@ public:
 
         if ((c == 255 && F[c] == bwt_size()) || F[c] >= F[c+1]) return {1,0};
 
-        ulint left = F[c];
-        ulint right = bwt_size() - 1;
+        ulint lb = F[c];
+        ulint rb = bwt_size() - 1;
 
-        if (c < 255) right = F[c+1] - 1;
+        if (c < 255) rb = F[c+1] - 1;
 
-        return {left,right};
+        return {lb,rb};
 
     }
 
@@ -280,7 +410,7 @@ public:
     }
 
     /*
-     * space complexity TODO:calculate space for Phi, Phi^{-1}
+     * space complexity 
      */
     ulint print_space() {
         std::cout << "Number of runs in bwt : " << bwt.number_of_runs() << std::endl;
@@ -289,6 +419,7 @@ public:
         tot_bytes += bwtR.print_space();
         std::cout << "\ntotal BWT space: " << tot_bytes << " bytes" << std::endl << std::endl;
 
+        // TODO:calculate space for Phi, Phi^{-1}
         return tot_bytes;
     }
 
@@ -330,15 +461,15 @@ private:
 
     /*
      * state variables for left_extension & right_extension
-     * [l,r]: BWT range of P
+     * [left,right]: BWT range of P
      * p: sample pos in BWT
      * j: SA[p]
      * d: offset between starting position of the pattern & j
-     * lR, rR, pR, jR, dR: correspondents to l,r,p,j,d in BWT^R
+     * leftR, rightR, pR, jR, dR: correspondents to left,right,p,j,d in BWT^R
      * len: current pattern length
      */
-    ulint l, r, p, j, d;
-    ulint lR, rR, pR, jR, dR;
+    ulint left, right, p, j, d;
+    ulint leftR, rightR, pR, jR, dR;
     ulint len;
 
 };

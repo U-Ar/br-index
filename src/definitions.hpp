@@ -2,9 +2,11 @@
 #define INCLUDED_DEFINITIONS_HPP
 
 #include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 #include <sdsl/sd_vector.hpp>
