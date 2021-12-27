@@ -11,7 +11,9 @@
 #include <vector>
 #include <sdsl/sd_vector.hpp>
 #include <sdsl/int_vector.hpp>
+#include <sdsl/int_vector_buffer.hpp>
 #include <sdsl/wavelet_trees.hpp>
+#include <sdsl/lcp_bitcompressed.hpp>
 
 
 namespace bri {

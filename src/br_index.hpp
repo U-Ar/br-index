@@ -11,6 +11,8 @@
 #include "definitions.hpp"
 #include "rle_string.hpp"
 #include "sparse_sd_vector.hpp"
+#include "permuted_lcp.hpp"
+#include "utils.hpp"
 
 namespace bri {
 
@@ -47,27 +49,84 @@ public:
 
         // build RLBWT
 
-        auto bwt_and_samples = sufsort(input);
+        // configure & build indexes for sufsort & plcp
+        sdsl::cache_config cc;
 
+        sdsl::int_vector<8> text(input.size());
+        for (ulint i = 0; i < input.size(); ++i)
+            text[i] = (uchar)input[i];
+
+        sdsl::append_zero_symbol(text);
+
+        // cache text
+        sdsl::store_to_cache(text, sdsl::conf::KEY_TEXT, cc);
+        sdsl::construct_config::byte_algo_sa = sais ? sdsl::SE_SAIS : sdsl::LIBDIVSUFSORT;
+        
+        // cache SA
+        sdsl::construct_sa<8>(cc);
+        
+        // cache ISA 
+        sdsl::construct_isa<8>(cc);
+
+        auto bwt_and_samples = sufsort(text,cc);
+
+        plcp = permuted_lcp<>(cc);
+
+        // remove cache of text and SA
+        sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_TEXT, cc));
+        sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_SA, cc));
+
+
+
+
+        // configure & build reversed indexes for sufsort
         std::reverse(input.begin(),input.end());
-        auto bwt_and_samplesR = sufsort(input);
+
+        sdsl::cache_config ccR;
+
+        sdsl::int_vector<8> textR(input.size());
+        for (ulint i = 0; i < input.size(); ++i)
+            textR[i] = (uchar)input[i];
+
+        sdsl::append_zero_symbol(textR);
+
+        // cache textR
+        sdsl::store_to_cache(textR, sdsl::conf::KEY_TEXT, ccR);
+        sdsl::construct_config::byte_algo_sa = sais ? sdsl::SE_SAIS : sdsl::LIBDIVSUFSORT;
+        
+        // cache SAR
+        sdsl::construct_sa<8>(ccR);
+        
+        // cache ISAR
+        sdsl::construct_isa<8>(ccR);
+
+        auto bwt_and_samplesR = sufsort(textR,ccR);
+        // plcp is not needed in the reversed case
+
+        // remove cache of textR and SAR
+        sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_TEXT, ccR));
+        sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_SA, ccR));
+
+
+
+
 
         std::string& bwt_s = std::get<0>(bwt_and_samples);
-        std::vector<std::pair<ulint,ulint> >& samples_first_vec = std::get<1>(bwt_and_samples);
-        std::vector<ulint>& samples_last_vec = std::get<2>(bwt_and_samples);
+        std::vector<range_t>& samples_first_vec = std::get<1>(bwt_and_samples);
+        std::vector<range_t>& samples_last_vec = std::get<2>(bwt_and_samples);
 
         std::string& bwt_sR = std::get<0>(bwt_and_samplesR);
-        std::vector<std::pair<ulint,ulint> >& samples_first_vecR = std::get<1>(bwt_and_samplesR);
-        std::vector<ulint>& samples_last_vecR = std::get<2>(bwt_and_samplesR);
+        std::vector<range_t>& samples_first_vecR = std::get<1>(bwt_and_samplesR);
+        std::vector<range_t>& samples_last_vecR = std::get<2>(bwt_and_samplesR);
 
         std::cout << "done.\n(2/3) Run length encoding BWT ... " << std::flush;
 
 
-
+        // run length compression on BWT and BWTR
         bwt = rle_string_t(bwt_s);
         bwtR = rle_string_t(bwt_sR);
 
-        // build F column
+        // build F column (common between text and textR)
         F = std::vector<ulint>(256,0);
 
         for (uchar c : bwt_s) 
@@ -81,6 +140,8 @@ public:
         for(ulint i = 1; i < 256; ++i) 
             F[i] += F[i-1];
 
+
+        // remember BWT position of terminator
 		for(ulint i = 0; i < bwt_s.size(); ++i)
 			if(bwt_s[i]==TERMINATOR)
 				terminator_position = i;
@@ -94,7 +155,6 @@ public:
         std::cout << "done." << std::endl << std::endl;
 
 
-
         r = bwt.number_of_runs();
         rR = bwtR.number_of_runs();
 
@@ -104,6 +164,10 @@ public:
         assert(samples_first_vecR.size() == rR);
         assert(samples_last_vecR.size() == rR);
 
+        int log_r = bitsize(r);
+        int log_rR = bitsize(rR);
+        int log_n = bitsize(bwt.size());
+
         std::cout << "Number of BWT equal-letter runs: r = " << r << std::endl;
 		std::cout << "Rate n/r = " << double(bwt.size())/r << std::endl;
 		std::cout << "log2(r) = " << std::log2(double(r)) << std::endl;
@@ -111,51 +175,91 @@ public:
 
         std::cout << "Number of BWT^R equal-letter runs: rR = " << rR << std::endl << std::endl;
 
+        // Phi, Phi inverse is needed only in forward case
+        std::cout << "(3/3) Building Phi/Phi^{-1} function ..." << std::flush;
+
+        
+        samples_last = int_vector<>(r,0,log_n);
+        samples_first = int_vector<>(r,0,log_n);
+        
+        samples_lastR = int_vector<>(rR,0,log_n);
+
+        for (ulint i = 0; i < r; ++i)
+        {
+            samples_last[i] = samples_last_vec[i].first;
+            samples_first[i] = samples_first_vec[i].first;
+        }
+        for (ulint i = 0; i < rR; ++i)
+            samples_lastR[i] = samples_last_vecR[i].first;
+
         // sort samples of first positions in runs according to text position
         std::sort(samples_first_vec.begin(), samples_first_vec.end());
+        // sort samples of last positions in runs according to text position
+        std::sort(samples.last_vec.begin(), samples_last_vec.end());
 
         // build Elias-Fano predecessor
         {
-            auto pred_bv = std::vector<bool>(bwt_s.size(),false);
+            std::vector<bool> first_bv(bwt_s.size(),false);
             for (auto p: samples_first_vec)
             {
                 assert(p.first < pred_bv.size());
-                pred_bv[p.first] = true;
+                first_bv[p.first] = true;
             }
-            pred = sparse_bitvector_t(pred_bv);
+            first = sparse_bitvector_t(first_bv);
         }
         {
-            auto pred_bvR = std::vector<bool>(bwt_sR.size(),false);
-            for (auto p: samples_first_vecR)
+            std::vector<bool> last_bv(bwt_s.size(),false);
+            for (auto p: samples_last_vec)
             {
-                assert(p.first < pred_bvR.size());
-                pred_bvR[p.first] = true;
+                assert(p.first < last_bv.size());
+                last_bv[p.first] = true;
             }
-            predR = sparse_bitvector_t(pred_bvR);
+            last = sparse_bitvector_t(last_bv);
         }
 
-        assert(pred.rank(pred.size()) == r);
-        assert(pred[pred.size()-1]);
-        assert(predR.rank(predR.size()) == rR);
-        assert(predR[predR.size()-1]);
+        assert(first.rank(first.size()) == r);
+        assert(last.rank(last.size()) == r);
 
-        samples_last = int_vector<>()
+        inv_order = int_vector<>(r,0,log_n);
+        
+        inv_orderR = int_vector<>(rR,0,log_n);
 
+        first_to_run = int_vector<>(r,0,log_r);
 
+        last_to_run = int_vector<>(r,0,log_r);
 
+        // construct first_to_run
+        for (ulint i = 0; i < samples_first_vec.size(); ++i)
+        {
+            first_to_run[i] = samples_first_vec[i].second;
+        }
 
+        // construct last_to_run
+        for (ulint i = 0; i < samples_last_vec.size(); ++i)
+        {
+            last_to_run[i] = samples_last_vec[i].second;
+        }
 
+        // construct inv_order
+        {
+            sdsl::int_vector_buffer<> isaR(sdsl::cache_file_name(sdsl::conf::KEY_ISA, ccR));
+            for (ulint i = 0; i < samples_last.size(); ++i)
+                inv_order[i] = isaR[bwt_s.size()-1-samples_last[i]];
+        }
 
+        // construct inv_orderR
+        {
+            sdsl::int_vector_buffer<> isa(sdsl::cache_file_name(sdsl::conf::KEY_ISA, cc));
+            for (ulint i = 0; i < samples_lastR.size(); ++i)
+                inv_orderR[i] = isa[bwt_s.size()-1-samples_lastR[i]];
+        }
 
-
-
+        // release ISA cache
+        sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_ISA, cc));
+        sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_ISA, ccR));
 
         
-
-
         std::cout << " done. " << std::endl << std::endl;
-
-        // TODO
 
     }
 
@@ -326,7 +430,33 @@ public:
      */
     std::vector<ulint> locate()
     {
-        //TODO
+        // TODO
+    }
+
+    /*
+     * reset the current searched pattern P
+     */
+    void reset_pattern()
+    {
+        // TODO
+    }
+
+    /*
+     * search the pattern cP (P:the current pattern)
+     * returns SA range corresponding to cP
+     */
+    range_t left_extension(uchar c)
+    {
+        // TODO
+    }
+
+    /*
+     * search the pattern Pc (P:the current pattern)
+     * return SA range corresponding to Pc
+     */
+    range_t right_extension(uchar c)
+    {
+        // TODO
     }
 
     /*
@@ -424,6 +554,79 @@ public:
     }
 
 private:
+    std::tuple<std::string, std::vector<range_t>, std::vector<range_t> > 
+    sufsort(sdsl::int_vector<8>& text, sdsl::cache_config& cc)
+    {
+        std::string bwt_s;
+
+        sdsl::int_vector_buffer<> sa(sdsl::cache_file_name(sdsl::conf::KEY_SA, cc));
+
+        std::vector<range_t> samples_first;
+        std::vector<range_t> samples_last;
+
+        {
+            for (ulint i = 0; i < sa.size(); ++i)
+            {
+                auto x = sa[i];
+
+                assert(x <= text.size());
+
+                if (x > 0) 
+                    bwt_s.push_back((uchar)text[x-1]);
+                else 
+                    bwt_s.push_back(TERMINATOR);
+                
+                // insert samples at beginnings of runs
+                if (i > 0)
+                {
+                    if (i==1 || (i>1 && bwt_s[i-1] != bwt_s[i-2]))
+                    {
+                        samples_first.push_back({
+                            sa[i-1] > 0
+                            ? sa[i-1] - 1
+                            : sa.size() - 1,
+                            samples_first.size()
+                        });
+                    }
+                    if (i==sa.size()-1 && bwt_s[i] != bwt_s[i-1])
+                    {
+                        samples_first.push_back({
+                            sa[i] > 0
+                            ? sa[i] - 1
+                            : sa.size() - 1,
+                            samples_first.size()
+                        });
+                    }
+                }
+
+                // insert samples at ends of runs
+                if (i > 0)
+                {
+                    if (bwt_s[i-1] != bwt_s[i])
+                    {
+                        samples_last.push_back({
+                            sa[i-1] > 0
+                            ? sa[i-1] - 1
+                            : sa.size() - 1,
+                            samples_last.size()
+                        });
+                    }
+                    if (i == sa.size()-1)
+                    {
+                        samples_last.push_back({
+                            sa[i] > 0
+                            ? sa[i] - 1
+                            : sa.size() - 1,
+                            samples_last.size()
+                        });
+                    }
+                }
+            }
+        }
+
+        return std::tuple<std::string, std::vector<range_t>, std::vector<range_t> >
+            (bwt_s, samples_first, samples_last);
+    }
 
     static bool contains_reserved_chars(std::string& s)
     {
@@ -451,25 +654,38 @@ private:
     ulint terminator_positionR = 0;
     ulint rR = 0;
 
-    sparse_bitvector_t pred;
+    // needed for left_extension
     sdsl::int_vector<> samples_last;
-    sdsl::int_vector<> pred_to_run;
+    sdsl::int_vector<> inv_order;
+    
+    // needed for Phi (SA[i] -> SA[i-1])
+    sparse_bitvector_t first;
+    sdsl::int_vector<> first_to_run;
+    
+    // needed for Phi^{-1} (SA[i] -> SA[i+1])
+    sparse_bitvector_t last;
+    sdsl::int_vector<> last_to_run;
+    sdsl::int_vector<> samples_first;
 
-    sparse_bitvector_t predR;
+    // needed for right_extension
     sdsl::int_vector<> samples_lastR;
-    sdsl::int_vector<> pred_to_runR;
+    sdsl::int_vector<> inv_orderR;
+
+    permuted_lcp<> plcp;
 
     /*
      * state variables for left_extension & right_extension
-     * [left,right]: BWT range of P
+     * range: BWT range of P
      * p: sample pos in BWT
      * j: SA[p]
      * d: offset between starting position of the pattern & j
-     * leftR, rightR, pR, jR, dR: correspondents to left,right,p,j,d in BWT^R
+     * rangeR, pR, jR, dR: correspondents to left,right,p,j,d in BWT^R
      * len: current pattern length
      */
-    ulint left, right, p, j, d;
-    ulint leftR, rightR, pR, jR, dR;
+    range_t range;
+    ulint p, j, d;
+    range_t rangeR;
+    ulint pR, jR, dR;
     ulint len;
 
 };
