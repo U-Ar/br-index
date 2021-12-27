@@ -33,6 +33,14 @@ public:
 
         this->sais = sais;
 
+        if (input.size() < 1)
+        {
+
+            std::cout << "Error: input string is empty" << std::endl;
+            exit(1);
+
+        }
+
         if (contains_reserved_chars(input))
         {
 
@@ -64,11 +72,14 @@ public:
         
         // cache SA
         sdsl::construct_sa<8>(cc);
-        
         // cache ISA 
         sdsl::construct_isa<8>(cc);
 
-        auto bwt_and_samples = sufsort(text,cc);
+        
+        sdsl::int_vector_buffer<> sa(sdsl::cache_file_name(sdsl::conf::KEY_SA, cc));
+        last_SA_val = sa[sa.size()-1];
+        auto bwt_and_samples = sufsort(text,sa);
+        ~sa();
 
         plcp = permuted_lcp<>(cc);
 
@@ -96,11 +107,12 @@ public:
         
         // cache SAR
         sdsl::construct_sa<8>(ccR);
-        
         // cache ISAR
         sdsl::construct_isa<8>(ccR);
 
-        auto bwt_and_samplesR = sufsort(textR,ccR);
+        sdsl::int_vector_buffer<> saR(sdsl::cache_file_name(sdsl::conf::KEY_SA, ccR));
+        auto bwt_and_samplesR = sufsort(textR,saR);
+        ~saR();
         // plcp is not needed in the reversed case
 
         // remove cache of textR and SAR
@@ -244,14 +256,14 @@ public:
         {
             sdsl::int_vector_buffer<> isaR(sdsl::cache_file_name(sdsl::conf::KEY_ISA, ccR));
             for (ulint i = 0; i < samples_last.size(); ++i)
-                inv_order[i] = isaR[bwt_s.size()-1-samples_last[i]];
+                inv_order[i] = isaR[bwt_s.size()-2-samples_last[i]];
         }
 
         // construct inv_orderR
         {
             sdsl::int_vector_buffer<> isa(sdsl::cache_file_name(sdsl::conf::KEY_ISA, cc));
             for (ulint i = 0; i < samples_lastR.size(); ++i)
-                inv_orderR[i] = isa[bwt_s.size()-1-samples_lastR[i]];
+                inv_orderR[i] = isa[bwt_s.size()-2-samples_lastR[i]];
         }
 
         // release ISA cache
@@ -321,7 +333,25 @@ public:
      */
     ulint Phi(ulint i)
     {
-        //TODO
+        assert(i != bwt.size() - 1);
+
+        ulint jr = first.predecessor_rank_circular(i);
+
+        assert(jr <= r - 1);
+
+        ulint k = first.select(jr);
+
+        assert(jr < r - 1 || k == bwt.size() - 1);
+
+        // distance from predecessor
+        ulint delta = k < i ? i - k : i + 1;
+
+        // check if Phi(SA[0]) is not called
+        assert(first_to_run[jr] > 0);
+
+        ulint prev_sample = samples_last[first_to_run[jr]-1];
+
+        return (prev_sample + delta) % bwt.size();
     }
     /*
      * Phi inverse
@@ -329,7 +359,25 @@ public:
      */
     ulint PhiI(ulint i)
     {
-        //TODO
+        assert(i != bwt.size() - 1);
+
+        ulint jr = last.predecessor_rank_circular(i);
+
+        assert(jr <= r - 1);
+
+        ulint k = last.select(jr);
+
+        assert(jr < r - 1 || k == bwt.size() - 1);
+
+        // distance from predecessor
+        ulint delta = k < i ? i - k : i + 1;
+
+        // check if Phi(SA[0]) is not called
+        assert(last_to_run[jr] < r-1);
+
+        ulint prev_sample = samples_first[last_to_run[jr]+1];
+
+        return (prev_sample + delta) % bwt.size();
     }
 
     ulint LF(ulint i)
@@ -410,8 +458,8 @@ public:
     range_t get_current_range(bool reversed = false)
     {
 
-        if (!reversed) return {l,r};
-        return {lR,rR};
+        if (!reversed) return range;
+        return rangeR;
 
     }
 
@@ -420,7 +468,7 @@ public:
      */
     ulint count()
     {
-        return (r + 1) - l;
+        return (range.second + 1) - range.first;
     }
 
     /*
@@ -430,7 +478,29 @@ public:
      */
     std::vector<ulint> locate()
     {
-        // TODO
+        assert(j >= d);
+
+        ulint sa = j - d;
+        ulint pos = sa;
+
+        std::deque<ulint> deq;
+        deq.push_back(pos);
+
+        while (plcp[pos] >= len) 
+        {
+            pos = Phi(pos);
+            deq.push_front(pos);
+        }
+        pos = sa;
+        while (true)
+        {
+            if (pos == last_SA_val) break;
+            pos = PhiI(pos);
+            if (plcp[pos] < len) break;
+            deq.push_back(pos);
+        }
+
+        return std::vector<ulint>(deq.begin(),deq.end());
     }
 
     /*
@@ -438,7 +508,22 @@ public:
      */
     void reset_pattern()
     {
-        // TODO
+        // entire SA range
+        range = full_range();
+        // lex order 0
+        p = 0;
+        // SA[0] = n - 1
+        j = bwt_size() - 1;
+        // offset 0
+        d = 0;
+
+        // entire SAR range
+        rangeR = full_range();
+        // reversed sample is initialized with 0 (not used instantly)
+        pR = jR = dR = 0;
+
+        // null pattern
+        len = 0;
     }
 
     /*
@@ -447,7 +532,64 @@ public:
      */
     range_t left_extension(uchar c)
     {
-        // TODO
+        range_t prev_range = range;
+
+        // get SA range of cP
+        range = LF(range,c);
+
+        // pattern cP was not found
+        if (range.first > range.second) return {1,0};
+
+        // accumulated occ of aP (for any a s.t. a < c)
+        ulint acc = 0;
+
+        for (uchar a = 2; a < c; ++a)
+        {
+            range_t smaller_range = LF(prev_range,a);
+            acc += (smaller_range.second+1) - smaller_range.first;
+        }
+
+        // get SAR range of (cP)^R
+        rangeR.second = rangeR.first + acc + range.second - range.first;
+        rangeR.first = rangeR.first + acc;
+
+        // cP and aP occurs for some a s.t. a != c
+        if (prev_range.second-prev_range.first != 
+            range.second-range.first)
+        {
+            // fint last c in range and get its sample
+            // there must be at least one c due to the previous if clause
+            ulint rnk = bwt.rank(prev_range.second+1,c);
+            assert(rnk > 0);
+
+            // update p by corresponding BWT position
+            p = bwt.select(rnk-1,c);
+            assert(p >= prev_range.first && p <= prev_range.second);
+
+            // run number of position p
+            ulint run_of_p = bwt.run_of_position(p);
+
+            // update j by SA[p]
+            j = samples_last[run_of_p];
+
+            // reset d
+            d = 0;
+
+            // lex order in SAR of position j
+            pR = inv_order[run_of_p];
+
+            // SAR[pR]
+            jR = bwt.size()-2-j
+
+            // reset dR
+            dR = len;
+        }
+        else // only c precedes P 
+        {
+            d++;
+        }
+        len++;
+        return range;
     }
 
     /*
@@ -456,7 +598,64 @@ public:
      */
     range_t right_extension(uchar c)
     {
-        // TODO
+        range_t prev_rangeR = rangeR;
+
+        // get SAR range of Pc
+        rangeR = LFR(rangeR,c);
+
+        // pattern Pc was not found
+        if (rangeR.first > rangeR.second) return {1,0};
+
+        // accumulated occ of Pa (for any a s.t. a < c)
+        ulint acc = 0;
+
+        for (uchar a = 2; a < c; ++a)
+        {
+            range_t smaller_rangeR = LF(prev_rangeR,a);
+            acc += (smaller_rangeR.second+1) - smaller_rangeR.first;
+        }
+
+        // get SA range of Pc
+        range.second = range.first + acc + rangeR.second - rangeR.first; 
+        range.first = range.first + acc;
+
+        // Pc and Pa occurs for some a s.t. a != c
+        if (prev_rangeR.second-prev_rangeR.first != 
+            rangeR.second-rangeR.first)
+        {
+            // fint last c in range and get its sample
+            // there must be at least one c due to the previous if clause
+            ulint rnk = bwtR.rank(prev_rangeR.second+1,c);
+            assert(rnk > 0);
+
+            // update pR by corresponding BWTR position
+            pR = bwtR.select(rnk-1,c);
+            assert(pR >= prev_rangeR.first && pR <= prev_rangeR.second);
+
+            // run number of position pR
+            ulint run_of_pR = bwtR.run_of_position(pR);
+
+            // update jR by SAR[pR]
+            jR = samples_lastR[run_of_pR];
+
+            // reset dR
+            dR = 0;
+
+            // lex order in SA of position jR
+            p = inv_orderR[run_of_pR];
+
+            // SA[p]
+            j = bwt.size()-2-jR;
+
+            // reset d
+            d = len;
+        }
+        else 
+        {
+            dR++;
+        }
+        len++;
+        return range;
     }
 
     /*
@@ -497,12 +696,70 @@ public:
 
     uint serialize(std::ostream& out)
     {
-        // TODO
+        ulint w_bytes = 0;
+
+        out.write((char*)&terminator_position,sizeof(terminator_position));
+        out.write((char*)&terminator_positionR,sizeof(terminator_positionR));
+        out.write((char*)&last_SA_val,sizeof(last_SA_val));
+        out.write((char*)F.data(),256*sizeof(ulint));
+
+        w_bytes += sizeof(terminator_position)
+                   + sizeof(terminator_positionR)
+                   + sizeof(last_SA_val)
+                   + 256*sizeof(ulint);
+        
+        w_bytes += bwt.serialize(out);
+        w_bytes += bwtR.serialize(out);
+
+        w_bytes += samples_last.serialize(out);
+        w_bytes += inv_order.serialize(out);
+
+        w_bytes += first.serialize(out);
+        w_bytes += first_to_run.serialize(out);
+
+        w_bytes += last.serialize(out);
+        w_bytes += last_to_run.serialize(out);
+        w_bytes += samples_first.serialize(out);
+
+        w_bytes += samples_lastR.serialize(out);
+        w_bytes += inv_orderR.serialize(out);
+
+        w_bytes += plcp.serialize(out);
+
+        return w_bytes;
+    
     }
 
     void load(std::istream& in)
     {
-        // TODO
+        
+        in.read((char*)&terminator_position,sizeof(terminator_position));
+        in.read((char*)&terminator_positionR,sizeof(terminator_positionR));
+        in.read((char*)&last_SA_val,sizeof(last_SA_val));
+        
+        F = std::vector<ulint>(256);
+        in.read((char*)F.data(),256*sizeof(ulint));
+
+        bwt.load(in);
+        bwtR.load(in);
+        r = bwt.number_of_runs();
+        rR = bwtR.number_of_runs();
+
+        samples_last.load(in);
+        inv_order.load(in);
+
+        first.load(in);
+        first_to_run.load(in);
+
+        last.load(in);
+        last_to_run.load(in);
+        samples_first.load(in);
+
+        samples_lastR.load(in);
+        inv_order.load(in);
+
+        plcp.load(in);
+
     }
 
     /*
@@ -540,27 +797,34 @@ public:
     }
 
     /*
-     * space complexity 
+     * get statistics
      */
-    ulint print_space() {
+    ulint print_stats() {
         std::cout << "Number of runs in bwt : " << bwt.number_of_runs() << std::endl;
         std::cout << "Numbef of runs in bwtR: " << bwtR.number_of_runs() << std::endl << std::endl;
         ulint tot_bytes = bwt.print_space();
         tot_bytes += bwtR.print_space();
         std::cout << "\ntotal BWT space: " << tot_bytes << " bytes" << std::endl << std::endl;
 
-        // TODO:calculate space for Phi, Phi^{-1}
+        // TODO 
         return tot_bytes;
+    }
+
+    /*
+     * get space complexity
+     */
+    ulint get_space()
+    {
+        ulint total_bytes = 0;
+        // TODO
+        return total_bytes;
     }
 
 private:
     std::tuple<std::string, std::vector<range_t>, std::vector<range_t> > 
-    sufsort(sdsl::int_vector<8>& text, sdsl::cache_config& cc)
+    sufsort(sdsl::int_vector<8>& text, sdsl::int_vector_buffer<>& sa)
     {
         std::string bwt_s;
-
-        sdsl::int_vector_buffer<> sa(sdsl::cache_file_name(sdsl::conf::KEY_SA, cc));
-
         std::vector<range_t> samples_first;
         std::vector<range_t> samples_last;
 
@@ -648,6 +912,7 @@ private:
     
     rle_string_t bwt;
     ulint terminator_position = 0;
+    ulint last_SA_val = 0;
     ulint r = 0;
 
     rle_string_t bwtR;

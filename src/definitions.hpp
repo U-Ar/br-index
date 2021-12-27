@@ -3,12 +3,14 @@
 
 #include <algorithm>
 #include <cmath>
+#include <deque>
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <tuple>
 #include <utility>
 #include <vector>
+#include <sdsl/construct.hpp>
 #include <sdsl/sd_vector.hpp>
 #include <sdsl/int_vector.hpp>
 #include <sdsl/int_vector_buffer.hpp>
