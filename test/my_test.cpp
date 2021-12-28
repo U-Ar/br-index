@@ -1,4 +1,4 @@
-#include "gtest/gtest.h"
+#include "iutest.hpp"
 
 int factorial(int n) {
     if (n == 0) return 1;
@@ -6,10 +6,10 @@ int factorial(int n) {
 }
 
 
-TEST(FactorialTest, HandlesZeroInput) {
-    EXPECT_EQ(1, factorial(0));
+IUTEST(FactorialTest, HandlesZeroInput) {
+    IUTEST_ASSERT_EQ(1, factorial(0));
 }
 
-TEST(FactorialTest, HandlesPositiveInput) {
-    EXPECT_EQ(6,factorial(3));
+IUTEST(FactorialTest, HandlesPositiveInput) {
+    IUTEST_ASSERT_EQ(6,factorial(3));
 }

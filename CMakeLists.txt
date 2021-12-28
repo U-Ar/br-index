@@ -1,4 +1,4 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.0)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.11)
 
 PROJECT(br-index CXX)
 
@@ -12,13 +12,13 @@ LINK_DIRECTORIES(${SDSL_LIB})
 
 SET(CMAKE_CXX_STANDARD 11)
 
-SET(CMAKE_CXX_FLAGS "-std=c++11")
-
 SET(CMAKE_CXX_FLAGS_DEBUG "-O0 -ggdb -g")
 SET(CMAKE_CXX_FLAGS_RELEASE "-g -ggdb -Ofast -fstrict-aliasing -DNDEBUG -march=native")
 SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-g -ggdb -Ofast -fstrict-aliasing -march=native")
 
 ADD_SUBDIRECTORY(test)
+ADD_SUBDIRECTORY(external)
+INCLUDE_DIRECTORIES(src)
 
 ADD_EXECUTABLE(bri-build src/bri-build.cpp)
 TARGET_LINK_LIBRARIES(bri-build sdsl)
