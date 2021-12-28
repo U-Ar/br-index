@@ -145,10 +145,33 @@ public:
         zeros.load(in);
     }
 
+    ulint print_space()
+    {
+        ulint tot_bytes = 0;
+
+        std::ofstream out("/dev/null");
+
+        auto bytes = ones.serialize(out);
+        tot_bytes += bytes;
+        std::cout << "PLCP ones bitvector: " << bytes << std::endl;
+
+        bytes = zeros.serialize(out);
+        tot_bytes += bytes;
+        std::cout << "PLCP zeros bitvector: " << bytes << std::endl;
+
+        return tot_bytes;
+    }
+
     ulint get_space()
     {
-        // TODO
-        return 0;
+        ulint tot_bytes = 0;
+
+        std::ofstream out("/dev/null");
+
+        tot_bytes += ones.serialize(out);
+        tot_bytes += zeros.serialize(out);
+
+        return tot_bytes;
     }
 
 private:

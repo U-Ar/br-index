@@ -64,7 +64,7 @@ public:
     /*
      * substitution operator.
      */
-    sparse_sd_vector& operator=(sparse_sd_vector& other)
+    /*sparse_sd_vector& operator=(const sparse_sd_vector& other)
     {
         u = other.size();
         if (other.rank_supported()) rank_enabled = true;
@@ -73,7 +73,7 @@ public:
         sdv = sdsl::sd_vector<>(other.raw_vector());
         if (rank_enabled) rank1 = sdsl::sd_vector<>::rank_1_type(&sdv);
         if (select_enabled) select1 = sdsl::sd_vector<>::select_1_type(&sdv);
-    }
+    }*/
 
     sdsl::sd_vector<>& raw_vector()
     {

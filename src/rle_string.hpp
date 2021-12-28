@@ -100,251 +100,267 @@ public:
             assert(run_heads.size() == r);
 
         }
+    }
 
-        uchar operator[](size_t i)
+    uchar operator[](size_t i)
+    {
+        assert(i < n);
+        return run_heads[run_of(i).first];
+    }
+
+    /*
+     * index of i-th character c 
+     */
+    size_t select(ulint i, uchar c)
+    {
+        assert(i<runs_per_letter[c].size());
+
+        // i-th c is inside j-th c-run
+        ulint j = runs_per_letter[c].rank(i);
+
+        assert(j==0 || i >= runs_per_letter[c].select(j-1)+1);
+
+        // starting position of i-th c inside its run
+        ulint before = (j==0 ? i : i-(runs_per_letter[c].select(j-1)+1));
+
+        // position in run_heads
+        ulint p = run_heads.select(j,c);
+
+        // k = number of bits before position of interest in the main string
+        // k is initialized looking at the sampled runs
+        assert(p/B==0 || p/B - 1 < runs.number_of_1());
+        ulint k = (p/B == 0 ? 0 : runs.select(p/B-1)+1);
+
+        // add remaining run length to k
+        for (ulint t = (p/B)*B; t < p; ++t) k += run_at(t);
+
+        return k + before;
+    }
+
+    /*
+     * number of c before position i
+     */
+    ulint rank(size_t i, uchar c)
+    {
+
+        assert(i <= n);
+
+        // c does not exist
+        if (runs_per_letter[c].size() == 0) return 0;
+
+        // number of all c
+        if (i == n) return runs_per_letter[c].size();
+
+        ulint last_block = runs.rank(i);
+        ulint current_run = last_block * B;
+
+        // current position in the string
+        ulint pos = 0;
+        if (last_block > 0) pos = runs.select(last_block-1) + 1;
+
+        assert(pos <= i);
+
+        ulint dist = i - pos;
+
+        // scan at most B runs
+        while (pos < i) 
         {
-            assert(i < n);
-            return run_heads[run_of(i).first];
+            pos += run_at(current_run);
+            current_run++;
+
+            if (pos <= i) dist = i - pos;
         }
 
-        /*
-         * index of i-th character c 
-         */
-        size_t select(ulint i, uchar c)
-        {
-            assert(i<runs_per_letter[c].size());
+        if (pos > i) current_run--;
 
-            // i-th c is inside j-th c-run
-            ulint j = runs_per_letter[c].rank(i);
+        assert(current_run < r);
 
-            assert(j==0 || i >= runs_per_letter[c].select(j-1)+1);
+        // number of c runs before the current run
+        ulint rk = run_heads.rank(current_run, c);
 
-            // starting position of i-th c inside its run
-            ulint before = (j==0 ? i : i-(runs_per_letter[c].select(j-1)+1));
+        // number of c before i in the current run
+        ulint tail = (run_heads[current_run] == c) * dist;
 
-            // position in run_heads
-            ulint p = run_heads.select(j,c);
+        if (rk == 0) return tail;
 
-            // k = number of bits before position of interest in the main string
-            // k is initialized looking at the sampled runs
-            assert(p/B==0 || p/B - 1 < runs.number_of_1());
-            ulint k = (p/B == 0 ? 0 : runs.select(p/B-1)+1);
+        return runs_per_letter[c].select(rk-1)+1+tail;
 
-            // add remaining run length to k
-            for (ulint t = (p/B)*B; t < p; ++t) k += run_at(t);
+    }
 
-            return k + before;
-        }
+    /*
+     * run number of text position i
+     */
+    ulint run_of_position(size_t i)
+    {
 
-        /*
-         * number of c before position i
-         */
-        ulint rank(size_t i, uchar c)
-        {
+        assert(i < n);
 
-            assert(i <= n);
+        ulint last_block = runs.rank(i);
+        ulint current_run = last_block * B;
 
-            // c does not exist
-            if (runs_per_letter[c].size() == 0) return 0;
+        //current position in the string: the first of a block
+        ulint pos = 0;
+        if(last_block > 0)
+            pos = runs.select(last_block-1)+1;
 
-            // number of all c
-            if (i == n) return runs_per_letter[c].size();
+        assert(pos <= i);
 
-            ulint last_block = runs.rank(i);
-            ulint current_run = last_block * B;
+        ulint dist = i - pos;
 
-            // current position in the string
-            ulint pos = 0;
-            if (last_block > 0) pos = runs.select(last_block-1) + 1;
+        //scan at most B runs
+        while(pos < i){
 
-            assert(pos <= i);
+            pos += run_at(current_run);
+            current_run++;
 
-            ulint dist = i - pos;
-
-            // scan at most B runs
-            while (pos < i) 
-            {
-                pos += run_at(current_run);
-                current_run++;
-
-                if (pos <= i) dist = i - pos;
-            }
-
-            if (pos > i) current_run--;
-
-            assert(current_run < r);
-
-            // number of c runs before the current run
-            ulint rk = run_heads.rank(current_run, c);
-
-            // number of c before i in the current run
-            ulint tail = (run_heads[current_run] == c) * dist;
-
-            if (rk == 0) return tail;
-
-            return runs_per_letter[c].select(rk-1)+1+tail;
-
-        }
-
-        /*
-         * run number of text position i
-         */
-        ulint run_of_position(size_t i)
-        {
-
-            assert(i < n);
-
-            ulint last_block = runs.rank(i);
-            ulint current_run = last_block * B;
-
-            //current position in the string: the first of a block
-            ulint pos = 0;
-            if(last_block > 0)
-                pos = runs.select(last_block-1)+1;
-
-            assert(pos <= i);
-
-            ulint dist = i - pos;
-
-            //scan at most B runs
-            while(pos < i){
-
-                pos += run_at(current_run);
-                current_run++;
-
-                if(pos <= i) dist = i - pos;
-
-            }
-
-            if(pos>i) current_run--;
-
-            assert(current_run < r);
-
-            return current_run;
+            if(pos <= i) dist = i - pos;
 
         }
 
-        ulint size() { return n; }
+        if(pos>i) current_run--;
 
-        /*
-         * inclusive range of j-th run
-         */
-        range_t run_range(ulint j)
+        assert(current_run < r);
+
+        return current_run;
+
+    }
+
+    ulint size() { return n; }
+
+    /*
+     * inclusive range of j-th run
+     */
+    range_t run_range(ulint j)
+    {
+
+        assert(j < run_heads.size());
+
+        ulint this_block = j/B;
+        ulint current_run = this_block * B;
+        ulint pos = (this_block == 0 ? 0 : runs.select(this_block-1)+1);
+
+        while (current_run < j)
         {
-
-            assert(j < run_heads.size());
-
-            ulint this_block = j/B;
-            ulint current_run = this_block * B;
-            ulint pos = (this_block == 0 ? 0 : runs.select(this_block-1)+1);
-
-            while (current_run < j)
-            {
-                pos += run_at(current_run);
-                current_run++;
-            }
-
-            assert(current_run == j);
-
-            return {pos, pos + run_at(j) - 1};
-
+            pos += run_at(current_run);
+            current_run++;
         }
 
-        /*
-         * length of i-th run
-         */
-        ulint run_at(ulint i)
-        {
+        assert(current_run == j);
 
-            assert(i < r);
-            uchar c = run_heads[i];
+        return {pos, pos + run_at(j) - 1};
 
-            return runs_per_letter[c].gap_at(run_heads.rank(i,c));
+    }
 
-        }
+    /*
+     * length of i-th run
+     */
+    ulint run_at(ulint i)
+    {
 
-        ulint number_of_runs() { return r; }
+        assert(i < r);
+        uchar c = run_heads[i];
 
-        ulint serialize(std::ostream& out)
-        {
+        return runs_per_letter[c].gap_at(run_heads.rank(i,c));
 
-            ulint w_bytes = 0;
+    }
 
-            out.write((char*)&n,sizeof(n));
-            out.write((char*)&r,sizeof(r));
-            out.write((char*)&B,sizeof(B));
+    ulint number_of_runs() { return r; }
 
-            w_bytes += sizeof(n) + sizeof(r) + sizeof(B);
+    ulint serialize(std::ostream& out)
+    {
 
-            if (n == 0) return w_bytes;
+        ulint w_bytes = 0;
 
-            w_bytes += runs.serialize(out);
+        out.write((char*)&n,sizeof(n));
+        out.write((char*)&r,sizeof(r));
+        out.write((char*)&B,sizeof(B));
 
-            for (ulint i = 0; i < 256; ++i)
-                w_bytes += runs_per_letter[i].serialize(out);
+        w_bytes += sizeof(n) + sizeof(r) + sizeof(B);
 
-            w_bytes += run_heads.serialize(out);
+        if (n == 0) return w_bytes;
 
-            return w_bytes;
+        w_bytes += runs.serialize(out);
 
-        }
+        for (ulint i = 0; i < 256; ++i)
+            w_bytes += runs_per_letter[i].serialize(out);
 
-        void load(std::istream& in)
-        {
+        w_bytes += run_heads.serialize(out);
 
-            in.read((char*)&n,sizeof(n));
-            in.read((char*)&r,sizeof(r));
-            in.read((char*)&B,sizeof(B));
+        return w_bytes;
 
-            if (n == 0) return;
+    }
 
-            runs.load(in);
+    void load(std::istream& in)
+    {
 
-            runs_per_letter = std::vector<sparse_bitvector_t>(256);
+        in.read((char*)&n,sizeof(n));
+        in.read((char*)&r,sizeof(r));
+        in.read((char*)&B,sizeof(B));
 
-            for (ulint i = 0; i < 256; ++i)
-                runs_per_letter[i].load(in);
-            
-            run_heads.load(in);
+        if (n == 0) return;
 
-        }
+        runs.load(in);
 
-        std::string to_string()
-        {
-            
-            std::string s;
+        runs_per_letter = std::vector<sparse_bitvector_t>(256);
 
-            for (size_t i = 0; i < size(); ++i)
-                s.push_back(operator[](i));
-            
-            return s;
+        for (ulint i = 0; i < 256; ++i)
+            runs_per_letter[i].load(in);
+        
+        run_heads.load(in);
 
-        }
+    }
 
-        ulint print_space()
-        {
+    std::string to_string()
+    {
+        
+        std::string s;
 
-            ulint tot_bytes = 0;
+        for (size_t i = 0; i < size(); ++i)
+            s.push_back(operator[](i));
+        
+        return s;
 
-            std::ofstream out("/dev/null");
-            auto bytesize = run.serialize(out);
-            tot_bytes += bytesize;
-            std::cout << "main runs bitvector: " << bytesize << " bytes" << std::endl;
+    }
 
-            bytesize = 0;
-            for (auto r: runs_per_letter) bytesize += r.serialize(out);
-            tot_bytes += bytesize;
-            std::cout << "runs-per-letter bitvectors: " << bytesize << " bytes" << std::endl;
+    ulint print_space()
+    {
 
-            bytesize = run_heads.serialize(out);
-            tot_bytes += bytesize;
-            std::cout << "run heads: " << bytesize << " bytes" << std::endl;
+        ulint tot_bytes = 0;
 
-            return tot_bytes;
+        std::ofstream out("/dev/null");
+        auto bytesize = runs.serialize(out);
+        tot_bytes += bytesize;
+        std::cout << "main runs bitvector: " << bytesize << " bytes" << std::endl;
 
-        }
+        bytesize = 0;
+        for (auto r: runs_per_letter) bytesize += r.serialize(out);
+        tot_bytes += bytesize;
+        std::cout << "runs-per-letter bitvectors: " << bytesize << " bytes" << std::endl;
 
+        bytesize = run_heads.serialize(out);
+        tot_bytes += bytesize;
+        std::cout << "run heads: " << bytesize << " bytes" << std::endl;
 
+        return tot_bytes;
+
+    }
+
+    ulint get_space()
+    {
+        ulint tot_bytes = 0;
+
+        std::ofstream out("/dev/null");
+        auto bytesize = runs.serialize(out);
+        tot_bytes += bytesize;
+
+        bytesize = 0;
+        for (auto r: runs_per_letter) bytesize += r.serialize(out);
+        tot_bytes += bytesize;
+
+        bytesize = run_heads.serialize(out);
+        tot_bytes += bytesize;
+
+        return tot_bytes;
 
     }
 

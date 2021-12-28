@@ -73,13 +73,13 @@ public:
         // cache SA
         sdsl::construct_sa<8>(cc);
         // cache ISA 
-        sdsl::construct_isa<8>(cc);
+        sdsl::construct_isa(cc);
 
         
         sdsl::int_vector_buffer<> sa(sdsl::cache_file_name(sdsl::conf::KEY_SA, cc));
         last_SA_val = sa[sa.size()-1];
         auto bwt_and_samples = sufsort(text,sa);
-        ~sa();
+        sa.~int_vector_buffer<>();
 
         plcp = permuted_lcp<>(cc);
 
@@ -108,11 +108,11 @@ public:
         // cache SAR
         sdsl::construct_sa<8>(ccR);
         // cache ISAR
-        sdsl::construct_isa<8>(ccR);
+        sdsl::construct_isa(ccR);
 
         sdsl::int_vector_buffer<> saR(sdsl::cache_file_name(sdsl::conf::KEY_SA, ccR));
         auto bwt_and_samplesR = sufsort(textR,saR);
-        ~saR();
+        saR.~int_vector_buffer<>();
         // plcp is not needed in the reversed case
 
         // remove cache of textR and SAR
@@ -191,10 +191,10 @@ public:
         std::cout << "(3/3) Building Phi/Phi^{-1} function ..." << std::flush;
 
         
-        samples_last = int_vector<>(r,0,log_n);
-        samples_first = int_vector<>(r,0,log_n);
+        samples_last = sdsl::int_vector<>(r,0,log_n);
+        samples_first = sdsl::int_vector<>(r,0,log_n);
         
-        samples_lastR = int_vector<>(rR,0,log_n);
+        samples_lastR = sdsl::int_vector<>(rR,0,log_n);
 
         for (ulint i = 0; i < r; ++i)
         {
@@ -207,14 +207,14 @@ public:
         // sort samples of first positions in runs according to text position
         std::sort(samples_first_vec.begin(), samples_first_vec.end());
         // sort samples of last positions in runs according to text position
-        std::sort(samples.last_vec.begin(), samples_last_vec.end());
+        std::sort(samples_last_vec.begin(), samples_last_vec.end());
 
         // build Elias-Fano predecessor
         {
             std::vector<bool> first_bv(bwt_s.size(),false);
             for (auto p: samples_first_vec)
             {
-                assert(p.first < pred_bv.size());
+                assert(p.first < first_bv.size());
                 first_bv[p.first] = true;
             }
             first = sparse_bitvector_t(first_bv);
@@ -232,13 +232,13 @@ public:
         assert(first.rank(first.size()) == r);
         assert(last.rank(last.size()) == r);
 
-        inv_order = int_vector<>(r,0,log_n);
+        inv_order = sdsl::int_vector<>(r,0,log_n);
         
-        inv_orderR = int_vector<>(rR,0,log_n);
+        inv_orderR = sdsl::int_vector<>(rR,0,log_n);
 
-        first_to_run = int_vector<>(r,0,log_r);
+        first_to_run = sdsl::int_vector<>(r,0,log_r);
 
-        last_to_run = int_vector<>(r,0,log_r);
+        last_to_run = sdsl::int_vector<>(r,0,log_r);
 
         // construct first_to_run
         for (ulint i = 0; i < samples_first_vec.size(); ++i)
@@ -579,7 +579,7 @@ public:
             pR = inv_order[run_of_p];
 
             // SAR[pR]
-            jR = bwt.size()-2-j
+            jR = bwt.size()-2-j;
 
             // reset dR
             dR = len;
@@ -756,7 +756,7 @@ public:
         samples_first.load(in);
 
         samples_lastR.load(in);
-        inv_order.load(in);
+        inv_orderR.load(in);
 
         plcp.load(in);
 
@@ -768,7 +768,7 @@ public:
     void save_to_file(std::string const& path_prefix)
     {
 
-        std::string path = path_prefix.append(".bri");
+        std::string path = path_prefix + ".bri";
         
         std::ofstream out(path);
         serialize(out);
@@ -799,14 +799,60 @@ public:
     /*
      * get statistics
      */
-    ulint print_stats() {
+    ulint print_space() {
         std::cout << "Number of runs in bwt : " << bwt.number_of_runs() << std::endl;
         std::cout << "Numbef of runs in bwtR: " << bwtR.number_of_runs() << std::endl << std::endl;
         ulint tot_bytes = bwt.print_space();
         tot_bytes += bwtR.print_space();
         std::cout << "\ntotal BWT space: " << tot_bytes << " bytes" << std::endl << std::endl;
 
-        // TODO 
+        tot_bytes += plcp.print_space();
+        std::cout << std::endl;
+
+        std::ofstream out("/dev/null");
+
+        ulint bytes = 0;
+
+        bytes =  samples_last.serialize(out);
+        tot_bytes += bytes;
+        std::cout << "samples_last: " << bytes << std::endl;
+
+        bytes =  inv_order.serialize(out);
+        tot_bytes += bytes;
+        std::cout << "inv_order: " << bytes << std::endl;
+
+
+        bytes =  first.serialize(out);
+        tot_bytes += bytes;
+        std::cout << "first: " << bytes << std::endl;
+
+        bytes =  first_to_run.serialize(out);
+        tot_bytes += bytes;
+        std::cout << "first_to_run: " << bytes << std::endl;
+
+
+        bytes =  last.serialize(out);
+        tot_bytes += bytes;
+        std::cout << "last: " << bytes << std::endl;
+
+        bytes =  last_to_run.serialize(out);
+        tot_bytes += bytes;
+        std::cout << "last_to_run: " << bytes << std::endl;
+
+        bytes =  samples_first.serialize(out);
+        tot_bytes += bytes;
+        std::cout << "samples_first: " << bytes << std::endl;
+
+
+        bytes =  samples_lastR.serialize(out);
+        tot_bytes += bytes;
+        std::cout << "samples_lastR: " << bytes << std::endl;
+
+        bytes =  inv_orderR.serialize(out);
+        tot_bytes += bytes;
+        std::cout << "inv_orderR: " << bytes << std::endl << std::endl;
+
+
         return tot_bytes;
     }
 
@@ -815,9 +861,27 @@ public:
      */
     ulint get_space()
     {
-        ulint total_bytes = 0;
-        // TODO
-        return total_bytes;
+        ulint tot_bytes = bwt.get_space();
+        tot_bytes += bwtR.get_space();
+
+        tot_bytes += plcp.get_space();
+
+        std::ofstream out("/dev/null");
+
+        tot_bytes += samples_last.serialize(out);
+        tot_bytes += inv_order.serialize(out);
+
+        tot_bytes += first.serialize(out);
+        tot_bytes += first_to_run.serialize(out);
+
+        tot_bytes += last.serialize(out);
+        tot_bytes += last_to_run.serialize(out);
+        tot_bytes += samples_first.serialize(out);
+
+        tot_bytes += samples_lastR.serialize(out);
+        tot_bytes += inv_orderR.serialize(out);
+
+        return tot_bytes;
     }
 
 private:
