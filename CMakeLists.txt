@@ -17,7 +17,6 @@ SET(CMAKE_CXX_FLAGS_RELEASE "-g -ggdb -Ofast -fstrict-aliasing -DNDEBUG -march=n
 SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-g -ggdb -Ofast -fstrict-aliasing -march=native")
 
 ADD_SUBDIRECTORY(test)
-#ADD_SUBDIRECTORY(external)
 INCLUDE_DIRECTORIES(src)
 
 ADD_EXECUTABLE(bri-build src/bri-build.cpp)
@@ -43,10 +42,23 @@ TARGET_LINK_LIBRARIES(bri-space divsufsort64)
 
 enable_testing()
 
-add_executable(run_tests test/test_all.cpp 
+add_executable(run_tests test/run_tests.cpp 
 	test/sparse_sd_vector_test.cpp 
 	test/my_test.cpp
+	test/huffman_string_test.cpp
+	test/rle_string_test.cpp
 )
 target_link_libraries(run_tests PRIVATE sdsl divsufsort divsufsort64)
 
 target_include_directories(run_tests PRIVATE ${PROJECT_SOURCE_DIR}/external/iutest/include)
+
+
+ADD_CUSTOM_TARGET(test-bri
+	COMMAND rm -rf test-tmp
+	COMMAND mkdir test-tmp
+	COMMAND ./run_tests
+	COMMAND rm -rf test-tmp
+	DEPENDS run_tests
+	WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+	COMMENT "Execute run_tests."
+)

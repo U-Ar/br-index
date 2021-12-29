@@ -39,8 +39,8 @@ public:
 
         u = b.size();
 
-        sdsl::bit_vector bv(b.size());
-        for (size_t i = 0; i < b.size(); ++i) bv[i] = b[i];
+        sdsl::bit_vector bv(u);
+        for (size_t i = 0; i < u; ++i) bv[i] = b[i];
 
         sdv = sdsl::sd_vector<>(bv);
         if (rank_enabled) rank1 = sdsl::sd_vector<>::rank_1_type(&sdv);
@@ -56,6 +56,8 @@ public:
         rank_enabled = enable_rank;
         select_enabled = enable_select;
 
+        u = bv.size();
+
         sdv = sdsl::sd_vector<>(bv);
         if (rank_enabled) rank1 = sdsl::sd_vector<>::rank_1_type(&sdv);
         if (select_enabled) select1 = sdsl::sd_vector<>::select_1_type(&sdv);
@@ -64,20 +66,17 @@ public:
     /*
      * substitution operator.
      */
-    /*sparse_sd_vector& operator=(const sparse_sd_vector& other)
+    sparse_sd_vector& operator=(const sparse_sd_vector& other)
     {
-        u = other.size();
-        if (other.rank_supported()) rank_enabled = true;
-        if (other.select_supported()) select_enabled = true;
+        u = other.sdv.size();
+        if (other.rank_enabled) rank_enabled = true;
+        if (other.select_enabled) select_enabled = true;
 
-        sdv = sdsl::sd_vector<>(other.raw_vector());
+        sdv = sdsl::sd_vector<>(other.sdv);
         if (rank_enabled) rank1 = sdsl::sd_vector<>::rank_1_type(&sdv);
         if (select_enabled) select1 = sdsl::sd_vector<>::select_1_type(&sdv);
-    }*/
 
-    sdsl::sd_vector<>& raw_vector()
-    {
-        return sdv;
+        return *this;
     }
 
     bool rank_supported() { return rank_enabled; }
@@ -139,7 +138,7 @@ public:
     {
         assert(select_enabled);
         assert(i<number_of_1());
-
+        
         if (i == 0) return select(0) + 1;
 
         return select(i) - select(i-1);
@@ -168,7 +167,7 @@ public:
     ulint number_of_1() { 
 
         assert(rank_enabled);
-        return rank1(size()); 
+        return rank1(u); 
 
     }
 

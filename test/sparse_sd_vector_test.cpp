@@ -35,12 +35,12 @@ IUTEST(SparseSdVectorTest, SaveLoadBasic) {
         std::vector<bool> vec(10000,false);
         bri::sparse_sd_vector bv(vec);
 
-        std::ofstream ofs("sparse_sd_vector_test.tmp");
+        std::ofstream ofs("test-tmp/sparse_sd_vector_test.tmp");
         ulint w_bytes = bv.serialize(ofs);
         std::cout << w_bytes << " bytes" << std::endl;
         ofs.close();
 
-        std::ifstream ifs("sparse_sd_vector_test.tmp");
+        std::ifstream ifs("test-tmp/sparse_sd_vector_test.tmp");
         bv.load(ifs);
         ifs.close();
         std::cout << "load complete" << std::endl;
@@ -57,12 +57,12 @@ IUTEST(SparseSdVectorTest, SaveLoadBasic) {
         std::vector<bool> vec(10000,true);
         bri::sparse_sd_vector bv(vec);
 
-        std::ofstream ofs("sparse_sd_vector_test2.tmp");
+        std::ofstream ofs("test-tmp/sparse_sd_vector_test2.tmp");
         ulint w_bytes = bv.serialize(ofs);
         std::cout << w_bytes << " bytes" << std::endl;
         ofs.close();
 
-        std::ifstream ifs("sparse_sd_vector_test2.tmp");
+        std::ifstream ifs("test-tmp/sparse_sd_vector_test2.tmp");
         bv.load(ifs);
         ifs.close();
         std::cout << "load complete" << std::endl;
@@ -148,5 +148,27 @@ IUTEST(SparseSdVectorTest, PredecessorRankCircular)
         {
             IUTEST_ASSERT_EQ(bv.predecessor_rank_circular(i),1);
         }
+    }
+}
+
+IUTEST(SparseSdVectorTest, NumberOfOne)
+{
+    {
+        std::vector<bool> vec(10000,1);
+        bri::sparse_sd_vector bv(vec);
+        IUTEST_ASSERT_EQ(bv.number_of_1(),10000);
+    }
+    {
+        std::vector<bool> vec(10000,0);
+        bri::sparse_sd_vector bv(vec);
+        IUTEST_ASSERT_EQ(bv.number_of_1(),0);
+    }
+    {
+        std::vector<bool> vec(10000,0);
+        vec[0] = 1;
+        vec[5000] = 1;
+        vec[9999] = 1;
+        bri::sparse_sd_vector bv(vec);
+        IUTEST_ASSERT_EQ(bv.number_of_1(),3);
     }
 }

@@ -107,8 +107,6 @@ public:
         
         // cache SAR
         sdsl::construct_sa<8>(ccR);
-        // cache ISAR
-        sdsl::construct_isa(ccR);
 
         sdsl::int_vector_buffer<> saR(sdsl::cache_file_name(sdsl::conf::KEY_SA, ccR));
         auto bwt_and_samplesR = sufsort(textR,saR);

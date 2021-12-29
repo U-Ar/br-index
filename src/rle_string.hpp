@@ -58,7 +58,7 @@ public:
 
         for (ulint i = 1; i < input.size(); ++i)
         {
-            if ((uchar)input[i] != last_c)
+            if (uchar(input[i]) != last_c)
             {
                 run_heads_s.push_back(last_c);
                 runs_per_letter_bv[last_c].push_back(true);
@@ -76,30 +76,31 @@ public:
                 runs_per_letter_bv[last_c].push_back(false);
 
             }
-
-            run_heads_s.push_back(last_c);
-            runs_per_letter_bv[last_c].push_back(true);
-            runs_bv.push_back(false);
-            r++;
-
-            assert(run_heads_s.size()==r);
-		    assert(r==count_runs(input));
-            assert(runs_bv.size()==input.size());
-
-            ulint t = 0;
-            for (ulint i = 0; i < 256; ++i) t += runs_per_letter_bv[i].size();
-            assert(t == input.size());
-
-            runs = sparse_bitvector_t(runs_bv);
-            runs_per_letter = std::vector<sparse_bitvector_t>(256);
-            for (ulint i = 0; i < 256; ++i)
-                runs_per_letter[i] = sparse_bitvector_t(runs_per_letter_bv[i]);
-            
-            run_heads = string_t(run_heads_s);
-
-            assert(run_heads.size() == r);
-
         }
+
+        run_heads_s.push_back(last_c);
+        runs_per_letter_bv[last_c].push_back(true);
+        runs_bv.push_back(false);
+        r++;
+
+        assert(run_heads_s.size()==r);
+        assert(r==count_runs(input));
+        assert(runs_bv.size()==input.size());
+
+        ulint t = 0;
+        for (ulint i = 0; i < 256; ++i) t += runs_per_letter_bv[i].size();
+        assert(t == input.size());
+
+        runs = sparse_bitvector_t(runs_bv);
+
+        runs_per_letter = std::vector<sparse_bitvector_t>(256);
+        for (ulint i = 0; i < 256; ++i)
+            runs_per_letter[i] = sparse_bitvector_t(runs_per_letter_bv[i]);
+
+        run_heads = string_t(run_heads_s);
+
+        assert(run_heads.size() == r);
+
     }
 
     uchar operator[](size_t i)
@@ -364,21 +365,6 @@ public:
 
     }
 
-private:
-
-    // static member func to count the number of runs in s
-    static ulint count_runs(std::string& s)
-    {
-        ulint runs = 1;
-
-        for (ulint i = 1; i < s.size(); ++i)
-        {
-            if (s[i] != s[i-1]) runs++;
-        }
-
-        return runs;
-    }
-
     // <j(run number of position i), p(last position of j-th run)>
     std::pair<ulint,ulint> run_of(ulint i)
     {
@@ -401,7 +387,7 @@ private:
 
         if (pos > i)
         {
-            current_run --;
+            current_run--;
         } else {
             pos += run_at(current_run);
         }
@@ -412,6 +398,20 @@ private:
         return {current_run, pos-1};
     }
 
+private:
+
+    // static member func to count the number of runs in s
+    static ulint count_runs(std::string& s)
+    {
+        ulint runs = 1;
+
+        for (ulint i = 1; i < s.size(); ++i)
+        {
+            if (s[i] != s[i-1]) runs++;
+        }
+
+        return runs;
+    }
 
     bool contains0(std::string& s)
     {
