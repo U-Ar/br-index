@@ -32,7 +32,8 @@ public:
         S[0] = true;
 
         ulint isa_val = isa[0];
-        ulint lcp_prev = lcp[isa_val], lcp_now;
+        ulint lcp_prev = lcp[isa_val];
+        ulint lcp_now;
         ulint pos = lcp_prev + 1;
 
         for (ulint i = 1; i < n; ++i)
@@ -40,7 +41,8 @@ public:
             S[pos] = true;
             isa_val = isa[i];
             lcp_now = lcp[isa_val];
-            pos += lcp_now - lcp_prev + 2;
+            pos += lcp_now + 2;
+            pos -= lcp_prev;
             lcp_prev = lcp_now;
         }
         S[pos] = true;
@@ -97,8 +99,8 @@ public:
     ulint operator[](size_t i)
     {
         assert(i < n);
-        ulint rank_0 = ones.rank(i);
-        if (rank_0)
+        ulint rank_0 = ones.rank(i+1);
+        if (rank_0 > 0)
         {
             size_t res = zeros.select(rank_0-1) - i + 1;
             return res;
@@ -172,6 +174,11 @@ public:
         tot_bytes += zeros.serialize(out);
 
         return tot_bytes;
+    }
+
+    ulint size()
+    {
+        return n;
     }
 
 private:
