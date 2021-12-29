@@ -4,6 +4,9 @@
 
 Bidirectional version of r-index.
 
+submoduleを使っているので、
+git cloneに--recursiveをつけるのを忘れない
+
 ## 完成後消す項目 実装方針
 
 - GoogleTestを導入してテストを入念に行う
