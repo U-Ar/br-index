@@ -65,6 +65,7 @@ IUTEST(PermutedLcpTest, A10TextOperations)
 
     std::ofstream ofs("test-tmp/permuted_lcp_test.tmp");
     auto w_bytes = plcp.serialize(ofs);
+    IUTEST_ASSERT_EQ(plcp.print_space(),plcp.get_space());
     std::cout << "PLCP: " << w_bytes << " bytes" << std::endl;
     ofs.close();
 
@@ -128,6 +129,7 @@ IUTEST(PermutedLcpTest, TwoCharTextOperations)
 
     std::ofstream ofs("test-tmp/permuted_lcp_test2.tmp");
     auto w_bytes = plcp.serialize(ofs);
+    IUTEST_ASSERT_EQ(plcp.print_space(),plcp.get_space());
     std::cout << "PLCP: " << w_bytes << " bytes" << std::endl;
     ofs.close();
 
@@ -193,6 +195,7 @@ IUTEST(PermutedLcpTest, A1000000TextOperations)
 
     std::ofstream ofs("test-tmp/permuted_lcp_test.tmp");
     auto w_bytes = plcp.serialize(ofs);
+    IUTEST_ASSERT_EQ(plcp.print_space(),plcp.get_space());
     std::cout << "PLCP: " << w_bytes << " bytes" << std::endl;
     ofs.close();
 

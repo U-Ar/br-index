@@ -44,7 +44,6 @@ enable_testing()
 
 add_executable(run_tests test/run_tests.cpp 
 	test/sparse_sd_vector_test.cpp 
-	test/my_test.cpp
 	test/huffman_string_test.cpp
 	test/rle_string_test.cpp
 	test/permuted_lcp_test.cpp
