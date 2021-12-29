@@ -28,6 +28,12 @@ public:
 
     br_index() {}
 
+    /*
+     * constructor. 
+     * \param input: string on which br-index is built
+     * \param sais: flag determining if we use SAIS for suffix sort. 
+     *              otherwise we use divsufsort
+     */
     br_index(std::string& input, bool sais = true)
     {
 
@@ -86,6 +92,7 @@ public:
         // remove cache of text and SA
         sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_TEXT, cc));
         sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_SA, cc));
+        sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_ISA, cc));
 
 
 
