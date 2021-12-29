@@ -23,7 +23,7 @@ public:
         sdsl::int_vector_buffer<> isa(sdsl::cache_file_name(sdsl::conf::KEY_ISA, cc));
 
         // construct LCP
-        sdsl::construct_lcp_PHI<8>(cc);
+        sdsl::construct_lcp_kasai<8>(cc);
         sdsl::int_vector_buffer<> lcp(sdsl::cache_file_name(sdsl::conf::KEY_LCP, cc));
 
         n = isa.size();

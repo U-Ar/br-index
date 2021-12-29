@@ -34,9 +34,9 @@ public:
      * \param sais: flag determining if we use SAIS for suffix sort. 
      *              otherwise we use divsufsort
      */
-    br_index(std::string& input, bool sais = true)
+    br_index(std::string const& input, bool sais = true)
     {
-
+        
         this->sais = sais;
 
         if (input.size() < 1)
@@ -85,26 +85,22 @@ public:
         sdsl::int_vector_buffer<> sa(sdsl::cache_file_name(sdsl::conf::KEY_SA, cc));
         last_SA_val = sa[sa.size()-1];
         auto bwt_and_samples = sufsort(text,sa);
-        sa.~int_vector_buffer<>();
 
         plcp = permuted_lcp<>(cc);
 
         // remove cache of text and SA
         sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_TEXT, cc));
         sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_SA, cc));
-        sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_ISA, cc));
 
 
 
 
         // configure & build reversed indexes for sufsort
-        std::reverse(input.begin(),input.end());
-
         sdsl::cache_config ccR;
 
         sdsl::int_vector<8> textR(input.size());
         for (ulint i = 0; i < input.size(); ++i)
-            textR[i] = (uchar)input[i];
+            textR[i] = (uchar)input[input.size()-1-i];
 
         sdsl::append_zero_symbol(textR);
 
@@ -114,10 +110,11 @@ public:
         
         // cache SAR
         sdsl::construct_sa<8>(ccR);
+        // cache ISAR
+        sdsl::construct_isa(ccR);
 
         sdsl::int_vector_buffer<> saR(sdsl::cache_file_name(sdsl::conf::KEY_SA, ccR));
         auto bwt_and_samplesR = sufsort(textR,saR);
-        saR.~int_vector_buffer<>();
         // plcp is not needed in the reversed case
 
         // remove cache of textR and SAR
@@ -260,22 +257,33 @@ public:
         // construct inv_order
         {
             sdsl::int_vector_buffer<> isaR(sdsl::cache_file_name(sdsl::conf::KEY_ISA, ccR));
+            assert(isaR.size() == bwt.size());
             for (ulint i = 0; i < samples_last.size(); ++i)
-                inv_order[i] = isaR[bwt_s.size()-2-samples_last[i]];
+            {
+                if (bwt.size() >= samples_last[i] + 2)
+                    inv_order[i] = isaR[bwt.size()-2-samples_last[i]];
+                else 
+                    inv_order[i] = 0;
+            }
         }
 
         // construct inv_orderR
         {
             sdsl::int_vector_buffer<> isa(sdsl::cache_file_name(sdsl::conf::KEY_ISA, cc));
+            assert(isa.size() == bwt.size());
             for (ulint i = 0; i < samples_lastR.size(); ++i)
-                inv_orderR[i] = isa[bwt_s.size()-2-samples_lastR[i]];
+            {
+                if (bwt.size() >= samples_lastR[i] + 2)
+                    inv_orderR[i] = isa[bwt.size()-2-samples_lastR[i]];
+                else 
+                    inv_orderR[i] = 0;
+            }
         }
 
         // release ISA cache
         sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_ISA, cc));
         sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_ISA, ccR));
 
-        
         std::cout << " done. " << std::endl << std::endl;
 
     }
@@ -961,7 +969,7 @@ private:
             (bwt_s, samples_first, samples_last);
     }
 
-    static bool contains_reserved_chars(std::string& s)
+    static bool contains_reserved_chars(std::string const& s)
     {
         for (auto c: s)
         {
@@ -975,7 +983,7 @@ private:
     bool sais = true;
 
     /*
-     * sparse RLBWT for both direction
+     * sparse RLBWT for text & textR
      */
     std::vector<ulint> F;
     
