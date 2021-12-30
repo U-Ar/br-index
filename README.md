@@ -13,6 +13,11 @@ r-index was originally proposed in the following papers:
 
 br-index we have proposed is achieved by using the mechanism of r-index but adding new structures. It allows for bi-directional extension of patterns.
 
+## System Requirements
+
+This project is based on [sdsl-lite](https://github.com/simongog/sdsl-lite) library.
+Install sdsl-lite beforehand and modify variables SDSL_INCLUDE and SDSL_LIB in _CMakeLists.txt_.
+
 ## How to use
 
 Firstly, clone the repository. Since a submodule is used ([iutest](https://github.com/srz-zumix/iutest)), recursive cloning is necessary.
