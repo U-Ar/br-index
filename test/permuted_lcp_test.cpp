@@ -1,6 +1,7 @@
 #include "iutest.hpp"
 #include <vector>
 #include <fstream>
+#include <sstream>
 #include <string>
 
 #include "../src/permuted_lcp.hpp"
@@ -220,3 +221,50 @@ IUTEST(PermutedLcpTest, A1000000TextOperations)
     remove(cache_file_name(conf::KEY_SA, cc));
     remove(cache_file_name(conf::KEY_ISA, cc));
 }
+
+
+
+/* test using external textfile
+IUTEST(PermutedLcpTest, BigText)
+{
+    std::ifstream ifs("dna.50MB");
+    std::stringstream buf;
+    buf << ifs.rdbuf();
+    std::string s(buf.str());
+    ifs >> s;
+    std::cout << "testing DNA " << std::endl;
+    std::cout << s.size() << std::endl;
+
+    cache_config cc;
+    int_vector<8> text(s.size());
+    for (ulint i = 0; i < s.size(); ++i)
+        text[i] = (uchar)s[i];
+    append_zero_symbol(text);
+
+    store_to_cache(text, conf::KEY_TEXT, cc);
+    construct_config::byte_algo_sa = SE_SAIS;
+
+    construct_sa<8>(cc);
+    construct_isa(cc);
+
+    permuted_lcp<> plcp(cc);
+
+    construct_lcp_kasai<8>(cc);
+    int_vector<> lcp;
+    load_from_file(lcp,cache_file_name(conf::KEY_LCP,cc));
+    int_vector<> isa;
+    load_from_file(isa,cache_file_name(conf::KEY_ISA,cc));
+
+    IUTEST_EXPECT_EQ(isa.size(),plcp.size());
+    for (ulint i = 0; i < isa.size(); ++i)
+    {
+        IUTEST_EXPECT_EQ(lcp[isa[i]],plcp[i]);
+    }
+
+
+    remove(cache_file_name(conf::KEY_TEXT, cc));
+    remove(cache_file_name(conf::KEY_SA, cc));
+    remove(cache_file_name(conf::KEY_ISA, cc));
+    remove(cache_file_name(conf::KEY_LCP, cc));
+}
+*/

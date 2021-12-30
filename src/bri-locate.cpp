@@ -113,9 +113,16 @@ void locate_all(ifstream& in, string patterns)
         idx.reset_pattern();
         range_t range{1,0};
 
+        /*
         for (ulint j = 0; j < m; ++j)
         {
             range = idx.right_extension((uchar)p[j]);
+            if (range.first > range.second) break;
+        }
+        */
+       for (int j = m-1; j >= 0; --j)
+        {
+            range = idx.left_extension((uchar)p[j]);
             if (range.first > range.second) break;
         }
 
@@ -127,12 +134,16 @@ void locate_all(ifstream& in, string patterns)
 
         if (c) // check occurrences
         {
+            cout << "pattern length: " << idx.pattern_length() << endl;
+            cout << "occ by LF     : " << (range.second + 1) - range.first <<  "   range by LF: [" << range.first << "," << range.second << "]"<< endl;
+            cout << "occ by locate : " << occs.size() << endl;
             for (auto o : occs)
             {
                 if (text.substr(o,p.size()).compare(p) != 0) 
                 {
-                    cout << "Error: wrong occurrence: " << o << endl;
-                    exit(0);
+                    cout << "Error: wrong occurrence:  " << o << endl;
+                    cout << "       original pattern:  " << p << endl;
+                    cout << "   1 + wrong    pattern: " << text.substr(o-1,p.size()+1) << endl;
                 }
             }
         }

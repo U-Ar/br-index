@@ -119,3 +119,77 @@ IUTEST(BrIndexTest, PeriodicTextLocate)
     IUTEST_EXPECT_EQ(12,vec[3]);
 
 }
+
+IUTEST(BrIndexTest, PhiPhiI)
+{
+    std::string s("abcdabcdabcdabcdhello");
+    br_index<> idx(s);
+    IUTEST_EXPECT_EQ(21,idx.Phi(0));
+    IUTEST_EXPECT_EQ(0,idx.Phi(4));
+    IUTEST_EXPECT_EQ(4,idx.Phi(8));
+    IUTEST_EXPECT_EQ(8,idx.Phi(12));
+    IUTEST_EXPECT_EQ(12,idx.Phi(1));
+    IUTEST_EXPECT_EQ(1,idx.Phi(5));
+    IUTEST_EXPECT_EQ(5,idx.Phi(9));
+    IUTEST_EXPECT_EQ(9,idx.Phi(13));
+    IUTEST_EXPECT_EQ(13,idx.Phi(2));
+    IUTEST_EXPECT_EQ(2,idx.Phi(6));
+    IUTEST_EXPECT_EQ(6,idx.Phi(10));
+    IUTEST_EXPECT_EQ(10,idx.Phi(14));
+    IUTEST_EXPECT_EQ(14,idx.Phi(3));
+    IUTEST_EXPECT_EQ(3,idx.Phi(7));
+
+    IUTEST_EXPECT_EQ(0,idx.PhiI(21));
+    IUTEST_EXPECT_EQ(4,idx.PhiI(0));
+    IUTEST_EXPECT_EQ(8,idx.PhiI(4));
+    IUTEST_EXPECT_EQ(12,idx.PhiI(8));
+    IUTEST_EXPECT_EQ(1,idx.PhiI(12));
+    IUTEST_EXPECT_EQ(5,idx.PhiI(1));
+    IUTEST_EXPECT_EQ(9,idx.PhiI(5));
+    IUTEST_EXPECT_EQ(13,idx.PhiI(9));
+    IUTEST_EXPECT_EQ(2,idx.PhiI(13));
+    IUTEST_EXPECT_EQ(6,idx.PhiI(2));
+    IUTEST_EXPECT_EQ(10,idx.PhiI(6));
+    IUTEST_EXPECT_EQ(14,idx.PhiI(10));
+    IUTEST_EXPECT_EQ(3,idx.PhiI(14));
+    IUTEST_EXPECT_EQ(7,idx.PhiI(3));
+
+}
+
+
+
+IUTEST(BrIndexTest, DNALikeTextLocate)
+{
+    std::string s("AAAATGCCGCCGCCATAAA");
+    br_index<> idx(s);
+    idx.reset_pattern();
+
+    idx.left_extension('C');
+    auto vec = idx.locate();
+    std::sort(vec.begin(),vec.end());
+    print_vec<>(vec);
+    IUTEST_EXPECT_EQ(6,vec[0]);
+    IUTEST_EXPECT_EQ(7,vec[1]);
+    IUTEST_EXPECT_EQ(9,vec[2]);
+    IUTEST_EXPECT_EQ(10,vec[3]);
+    IUTEST_EXPECT_EQ(12,vec[4]);
+    IUTEST_EXPECT_EQ(13,vec[5]);
+
+    idx.left_extension('C');
+    vec = idx.locate();
+    std::sort(vec.begin(),vec.end());
+    print_vec<>(vec);
+    IUTEST_EXPECT_EQ(6,vec[0]);
+    IUTEST_EXPECT_EQ(9,vec[1]);
+    IUTEST_EXPECT_EQ(12,vec[2]);
+
+    idx.left_extension('G');
+    vec = idx.locate();
+    std::sort(vec.begin(),vec.end());
+    print_vec<>(vec);
+    IUTEST_EXPECT_EQ(5,vec[0]);
+    IUTEST_EXPECT_EQ(8,vec[1]);
+    IUTEST_EXPECT_EQ(11,vec[2]);
+
+
+}

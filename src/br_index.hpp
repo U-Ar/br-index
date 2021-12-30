@@ -196,6 +196,7 @@ public:
         samples_last = sdsl::int_vector<>(r,0,log_n);
         samples_first = sdsl::int_vector<>(r,0,log_n);
         
+        samples_firstR = sdsl::int_vector<>(rR,0,log_n);
         samples_lastR = sdsl::int_vector<>(rR,0,log_n);
 
         for (ulint i = 0; i < r; ++i)
@@ -204,7 +205,10 @@ public:
             samples_first[i] = samples_first_vec[i].first;
         }
         for (ulint i = 0; i < rR; ++i)
+        {
             samples_lastR[i] = samples_last_vecR[i].first;
+            samples_firstR[i] = samples_first_vecR[i].first;
+        }
 
         // sort samples of first positions in runs according to text position
         std::sort(samples_first_vec.begin(), samples_first_vec.end());
@@ -377,7 +381,7 @@ public:
      */
     ulint PhiI(ulint i)
     {
-        assert(i != bwt.size() - 1);
+        assert(i != last_SA_val);
 
         ulint jr = last.predecessor_rank_circular(i);
 
@@ -558,7 +562,7 @@ public:
      */
     range_t left_extension(uchar c)
     {
-        range_t prev_range = range;
+        range_t prev_range(range);
 
         // get SA range of cP
         range = LF(range,c);
@@ -596,7 +600,10 @@ public:
             ulint run_of_p = bwt.run_of_position(p);
 
             // update j by SA[p]
-            j = samples_last[run_of_p];
+            if (bwt[prev_range.second] == c)
+                j = samples_first[run_of_p];
+            else
+                j = samples_last[run_of_p];
 
             // reset d
             d = 0;
@@ -624,7 +631,7 @@ public:
      */
     range_t right_extension(uchar c)
     {
-        range_t prev_rangeR = rangeR;
+        range_t prev_rangeR(rangeR);
 
         // get SAR range of Pc
         rangeR = LFR(rangeR,c);
@@ -662,7 +669,10 @@ public:
             ulint run_of_pR = bwtR.run_of_position(pR);
 
             // update jR by SAR[pR]
-            jR = samples_lastR[run_of_pR];
+            if (bwtR[prev_rangeR.second] == c)
+                jR = samples_firstR[run_of_pR];
+            else
+                jR = samples_lastR[run_of_pR];
 
             // reset dR
             dR = 0;
@@ -737,6 +747,7 @@ public:
         w_bytes += bwt.serialize(out);
         w_bytes += bwtR.serialize(out);
 
+        w_bytes += samples_first.serialize(out);
         w_bytes += samples_last.serialize(out);
         w_bytes += inv_order.serialize(out);
 
@@ -745,8 +756,8 @@ public:
 
         w_bytes += last.serialize(out);
         w_bytes += last_to_run.serialize(out);
-        w_bytes += samples_first.serialize(out);
 
+        w_bytes += samples_firstR.serialize(out);
         w_bytes += samples_lastR.serialize(out);
         w_bytes += inv_orderR.serialize(out);
 
@@ -771,6 +782,7 @@ public:
         r = bwt.number_of_runs();
         rR = bwtR.number_of_runs();
 
+        samples_first.load(in);
         samples_last.load(in);
         inv_order.load(in);
 
@@ -779,8 +791,8 @@ public:
 
         last.load(in);
         last_to_run.load(in);
-        samples_first.load(in);
 
+        samples_firstR.load(in);
         samples_lastR.load(in);
         inv_orderR.load(in);
 
@@ -839,6 +851,11 @@ public:
 
         ulint bytes = 0;
 
+        
+        bytes =  samples_first.serialize(out);
+        tot_bytes += bytes;
+        std::cout << "samples_first: " << bytes << std::endl;
+
         bytes =  samples_last.serialize(out);
         tot_bytes += bytes;
         std::cout << "samples_last: " << bytes << std::endl;
@@ -865,10 +882,10 @@ public:
         tot_bytes += bytes;
         std::cout << "last_to_run: " << bytes << std::endl;
 
-        bytes =  samples_first.serialize(out);
-        tot_bytes += bytes;
-        std::cout << "samples_first: " << bytes << std::endl;
 
+        bytes =  samples_firstR.serialize(out);
+        tot_bytes += bytes;
+        std::cout << "samples_firstR: " << bytes << std::endl;
 
         bytes =  samples_lastR.serialize(out);
         tot_bytes += bytes;
@@ -894,6 +911,7 @@ public:
 
         std::ofstream out("/dev/null");
 
+        tot_bytes += samples_first.serialize(out);
         tot_bytes += samples_last.serialize(out);
         tot_bytes += inv_order.serialize(out);
 
@@ -902,8 +920,8 @@ public:
 
         tot_bytes += last.serialize(out);
         tot_bytes += last_to_run.serialize(out);
-        tot_bytes += samples_first.serialize(out);
 
+        tot_bytes += samples_firstR.serialize(out);
         tot_bytes += samples_lastR.serialize(out);
         tot_bytes += inv_orderR.serialize(out);
 
@@ -1010,6 +1028,7 @@ private:
     ulint rR = 0;
 
     // needed for left_extension
+    sdsl::int_vector<> samples_first;
     sdsl::int_vector<> samples_last;
     sdsl::int_vector<> inv_order;
     
@@ -1020,9 +1039,9 @@ private:
     // needed for Phi^{-1} (SA[i] -> SA[i+1])
     sparse_bitvector_t last;
     sdsl::int_vector<> last_to_run;
-    sdsl::int_vector<> samples_first;
 
     // needed for right_extension
+    sdsl::int_vector<> samples_firstR;
     sdsl::int_vector<> samples_lastR;
     sdsl::int_vector<> inv_orderR;
 
