@@ -20,12 +20,17 @@ public:
     permuted_lcp(sdsl::cache_config& cc)
     {
         // construct ISA
-        sdsl::int_vector_buffer<> isa(sdsl::cache_file_name(sdsl::conf::KEY_ISA, cc));
+        //sdsl::int_vector_buffer<> isa(sdsl::cache_file_name(sdsl::conf::KEY_ISA, cc));
+        sdsl::int_vector<> isa;
+        sdsl::load_from_file(isa, sdsl::cache_file_name(sdsl::conf::KEY_ISA, cc));
 
         // construct LCP
         sdsl::construct_lcp_kasai<8>(cc);
-        sdsl::int_vector_buffer<> lcp(sdsl::cache_file_name(sdsl::conf::KEY_LCP, cc));
-
+        //sdsl::int_vector_buffer<> lcp(sdsl::cache_file_name(sdsl::conf::KEY_LCP, cc));
+        
+        sdsl::int_vector<> lcp;
+        sdsl::load_from_file(lcp, sdsl::cache_file_name(sdsl::conf::KEY_LCP, cc));
+       
         n = isa.size();
 
         std::vector<bool> S(2*n+1,false);

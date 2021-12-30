@@ -256,7 +256,9 @@ public:
 
         // construct inv_order
         {
-            sdsl::int_vector_buffer<> isaR(sdsl::cache_file_name(sdsl::conf::KEY_ISA, ccR));
+            //sdsl::int_vector_buffer<> isaR(sdsl::cache_file_name(sdsl::conf::KEY_ISA, ccR));
+            sdsl::int_vector<> isaR;
+            sdsl::load_from_file(isaR, sdsl::cache_file_name(sdsl::conf::KEY_ISA, ccR));
             assert(isaR.size() == bwt.size());
             for (ulint i = 0; i < samples_last.size(); ++i)
             {
@@ -269,7 +271,9 @@ public:
 
         // construct inv_orderR
         {
-            sdsl::int_vector_buffer<> isa(sdsl::cache_file_name(sdsl::conf::KEY_ISA, cc));
+            //sdsl::int_vector_buffer<> isa(sdsl::cache_file_name(sdsl::conf::KEY_ISA, cc));
+            sdsl::int_vector<> isa;
+            sdsl::load_from_file(isa, sdsl::cache_file_name(sdsl::conf::KEY_ISA, cc));
             assert(isa.size() == bwt.size());
             for (ulint i = 0; i < samples_lastR.size(); ++i)
             {
@@ -286,6 +290,7 @@ public:
 
         std::cout << " done. " << std::endl << std::endl;
 
+        reset_pattern();
     }
 
     /*
@@ -540,6 +545,14 @@ public:
     }
 
     /*
+     * get the length of current searched pattern P
+     */
+    ulint pattern_length()
+    {
+        return len;
+    }
+
+    /*
      * search the pattern cP (P:the current pattern)
      * returns SA range corresponding to cP
      */
@@ -556,9 +569,9 @@ public:
         // accumulated occ of aP (for any a s.t. a < c)
         ulint acc = 0;
 
-        for (uchar a = 2; a < c; ++a)
+        for (ulint a = 0; a < c; ++a)
         {
-            range_t smaller_range = LF(prev_range,a);
+            range_t smaller_range = LF(prev_range,(uchar)a);
             acc += (smaller_range.second+1) - smaller_range.first;
         }
 
@@ -622,9 +635,9 @@ public:
         // accumulated occ of Pa (for any a s.t. a < c)
         ulint acc = 0;
 
-        for (uchar a = 2; a < c; ++a)
+        for (ulint a = 0; a < c; ++a)
         {
-            range_t smaller_rangeR = LF(prev_rangeR,a);
+            range_t smaller_rangeR = LFR(prev_rangeR,(uchar)a);
             acc += (smaller_rangeR.second+1) - smaller_rangeR.first;
         }
 
