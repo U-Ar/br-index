@@ -50,6 +50,15 @@ Also, you can run unit tests by
 make test-bri
 ```
 
+## versions
+
+<dl>
+	<dt>br_index_naive.hpp</dt>
+	<dd>Naive implementation of br-index. All samples p,j,d,pR,jR,dR,len are maintained during the search.</dd>
+	<dt>br_index.hpp</dt>
+	<dd>Simplified implementation of br-index (default). Only samples necessary for _locate_ (j,d,len) are maintained.</dd>
+</dl>
+
 ## 実装方針(仮) in 日本語
 
 - GoogleTestを導入してテストを入念に行う

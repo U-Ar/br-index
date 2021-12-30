@@ -20,7 +20,7 @@ template<
     class sparse_bitvector_t = sparse_sd_vector,
     class rle_string_t = rle_string_sd 
 >
-class br_index {
+class br_index_naive {
 
 public:
 
@@ -91,7 +91,6 @@ public:
         // remove cache of text and SA
         sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_TEXT, cc));
         sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_SA, cc));
-        sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_ISA, cc));
 
 
 
@@ -112,7 +111,7 @@ public:
         // cache SAR
         sdsl::construct_sa<8>(ccR);
         // cache ISAR
-        //sdsl::construct_isa(ccR);
+        sdsl::construct_isa(ccR);
 
         sdsl::int_vector_buffer<> saR(sdsl::cache_file_name(sdsl::conf::KEY_SA, ccR));
         auto bwt_and_samplesR = sufsort(textR,saR);
@@ -239,6 +238,10 @@ public:
         assert(first.rank(first.size()) == r);
         assert(last.rank(last.size()) == r);
 
+        inv_order = sdsl::int_vector<>(r,0,log_n);
+        
+        inv_orderR = sdsl::int_vector<>(rR,0,log_n);
+
         first_to_run = sdsl::int_vector<>(r,0,log_r);
 
         last_to_run = sdsl::int_vector<>(r,0,log_r);
@@ -255,9 +258,39 @@ public:
             last_to_run[i] = samples_last_vec[i].second;
         }
 
+        // construct inv_order
+        {
+            //sdsl::int_vector_buffer<> isaR(sdsl::cache_file_name(sdsl::conf::KEY_ISA, ccR));
+            sdsl::int_vector<> isaR;
+            sdsl::load_from_file(isaR, sdsl::cache_file_name(sdsl::conf::KEY_ISA, ccR));
+            assert(isaR.size() == bwt.size());
+            for (ulint i = 0; i < samples_last.size(); ++i)
+            {
+                if (bwt.size() >= samples_last[i] + 2)
+                    inv_order[i] = isaR[bwt.size()-2-samples_last[i]];
+                else 
+                    inv_order[i] = 0;
+            }
+        }
+
+        // construct inv_orderR
+        {
+            //sdsl::int_vector_buffer<> isa(sdsl::cache_file_name(sdsl::conf::KEY_ISA, cc));
+            sdsl::int_vector<> isa;
+            sdsl::load_from_file(isa, sdsl::cache_file_name(sdsl::conf::KEY_ISA, cc));
+            assert(isa.size() == bwt.size());
+            for (ulint i = 0; i < samples_lastR.size(); ++i)
+            {
+                if (bwt.size() >= samples_lastR[i] + 2)
+                    inv_orderR[i] = isa[bwt.size()-2-samples_lastR[i]];
+                else 
+                    inv_orderR[i] = 0;
+            }
+        }
+
         // release ISA cache
-        //sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_ISA, cc));
-        //sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_ISA, ccR));
+        sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_ISA, cc));
+        sdsl::remove(sdsl::cache_file_name(sdsl::conf::KEY_ISA, ccR));
 
         std::cout << " done. " << std::endl << std::endl;
 
@@ -499,6 +532,8 @@ public:
     {
         // entire SA range
         range = full_range();
+        // lex order 0
+        p = 0;
         // SA[0] = n - 1
         j = bwt_size() - 1;
         // offset 0
@@ -506,6 +541,8 @@ public:
 
         // entire SAR range
         rangeR = full_range();
+        // reversed sample is initialized with 0 (not used instantly)
+        pR = jR = dR = 0;
 
         // null pattern
         len = 0;
@@ -556,7 +593,7 @@ public:
             assert(rnk > 0);
 
             // update p by corresponding BWT position
-            ulint p = bwt.select(rnk-1,c);
+            p = bwt.select(rnk-1,c);
             assert(p >= prev_range.first && p <= prev_range.second);
 
             // run number of position p
@@ -571,6 +608,14 @@ public:
             // reset d
             d = 0;
 
+            // lex order in SAR of position j
+            pR = inv_order[run_of_p];
+
+            // SAR[pR]
+            jR = bwt.size()-2-j;
+
+            // reset dR
+            dR = len;
         }
         else // only c precedes P 
         {
@@ -617,27 +662,34 @@ public:
             assert(rnk > 0);
 
             // update pR by corresponding BWTR position
-            ulint pR = bwtR.select(rnk-1,c);
+            pR = bwtR.select(rnk-1,c);
             assert(pR >= prev_rangeR.first && pR <= prev_rangeR.second);
 
             // run number of position pR
             ulint run_of_pR = bwtR.run_of_position(pR);
 
-            // j = SA[p]
+            // update jR by SAR[pR]
             if (bwtR[prev_rangeR.second] == c)
-                j = bwt.size()-2-samples_firstR[run_of_pR];
+                jR = samples_firstR[run_of_pR];
             else
-                j = bwt.size()-2-samples_lastR[run_of_pR];
+                jR = samples_lastR[run_of_pR];
+
+            // reset dR
+            dR = 0;
+
+            // lex order in SA of position jR
+            p = inv_orderR[run_of_pR];
+
+            // SA[p]
+            j = bwt.size()-2-jR;
 
             // reset d
             d = len;
         }
-        /* only c follows P
         else 
         {
             dR++;
         }
-        */
         len++;
         return range;
     }
@@ -697,6 +749,7 @@ public:
 
         w_bytes += samples_first.serialize(out);
         w_bytes += samples_last.serialize(out);
+        w_bytes += inv_order.serialize(out);
 
         w_bytes += first.serialize(out);
         w_bytes += first_to_run.serialize(out);
@@ -706,6 +759,7 @@ public:
 
         w_bytes += samples_firstR.serialize(out);
         w_bytes += samples_lastR.serialize(out);
+        w_bytes += inv_orderR.serialize(out);
 
         w_bytes += plcp.serialize(out);
 
@@ -730,6 +784,7 @@ public:
 
         samples_first.load(in);
         samples_last.load(in);
+        inv_order.load(in);
 
         first.load(in);
         first_to_run.load(in);
@@ -739,6 +794,7 @@ public:
 
         samples_firstR.load(in);
         samples_lastR.load(in);
+        inv_orderR.load(in);
 
         plcp.load(in);
 
@@ -804,6 +860,10 @@ public:
         tot_bytes += bytes;
         std::cout << "samples_last: " << bytes << std::endl;
 
+        bytes =  inv_order.serialize(out);
+        tot_bytes += bytes;
+        std::cout << "inv_order: " << bytes << std::endl;
+
 
         bytes =  first.serialize(out);
         tot_bytes += bytes;
@@ -831,6 +891,10 @@ public:
         tot_bytes += bytes;
         std::cout << "samples_lastR: " << bytes << std::endl;
 
+        bytes =  inv_orderR.serialize(out);
+        tot_bytes += bytes;
+        std::cout << "inv_orderR: " << bytes << std::endl << std::endl;
+
 
         return tot_bytes;
     }
@@ -849,6 +913,7 @@ public:
 
         tot_bytes += samples_first.serialize(out);
         tot_bytes += samples_last.serialize(out);
+        tot_bytes += inv_order.serialize(out);
 
         tot_bytes += first.serialize(out);
         tot_bytes += first_to_run.serialize(out);
@@ -858,6 +923,7 @@ public:
 
         tot_bytes += samples_firstR.serialize(out);
         tot_bytes += samples_lastR.serialize(out);
+        tot_bytes += inv_orderR.serialize(out);
 
         return tot_bytes;
     }
@@ -964,6 +1030,7 @@ private:
     // needed for left_extension
     sdsl::int_vector<> samples_first;
     sdsl::int_vector<> samples_last;
+    sdsl::int_vector<> inv_order;
     
     // needed for Phi (SA[i] -> SA[i-1])
     sparse_bitvector_t first;
@@ -976,20 +1043,23 @@ private:
     // needed for right_extension
     sdsl::int_vector<> samples_firstR;
     sdsl::int_vector<> samples_lastR;
+    sdsl::int_vector<> inv_orderR;
 
     permuted_lcp<> plcp;
 
     /*
      * state variables for left_extension & right_extension
      * range: BWT range of P
+     * p: sample pos in BWT
      * j: SA[p]
      * d: offset between starting position of the pattern & j
-     * rangeR: correspondents to range in reversed text
+     * rangeR, pR, jR, dR: correspondents to left,right,p,j,d in BWT^R
      * len: current pattern length
      */
     range_t range;
-    ulint j, d;
+    ulint p, j, d;
     range_t rangeR;
+    ulint pR, jR, dR;
     ulint len;
 
 };

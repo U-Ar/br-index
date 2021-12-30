@@ -113,18 +113,18 @@ void locate_all(ifstream& in, string patterns)
         idx.reset_pattern();
         range_t range{1,0};
 
-        /*
+        
         for (ulint j = 0; j < m; ++j)
         {
             range = idx.right_extension((uchar)p[j]);
             if (range.first > range.second) break;
         }
-        */
-       for (int j = m-1; j >= 0; --j)
+        /*
+        for (int j = m-1; j >= 0; --j)
         {
             range = idx.left_extension((uchar)p[j]);
             if (range.first > range.second) break;
-        }
+        }*/
 
         vector<ulint> occs;
 
