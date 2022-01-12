@@ -2,7 +2,7 @@
 
 ## About
 
-This repository implements __bidirectional__ r-index (br-index).
+This repository implements __bi-directional__ r-index (br-index).
 
 r-index is a compressed text index which supports count(P) and locate(P).
 Its size is O(r) words, whose r is the number of equal-letter runs in BWT of the text.
@@ -18,7 +18,7 @@ br-index we have proposed is achieved by using the mechanism of r-index but addi
 This project is based on [sdsl-lite](https://github.com/simongog/sdsl-lite) library.
 Install sdsl-lite beforehand and modify variables SDSL_INCLUDE and SDSL_LIB in _CMakeLists.txt_.
 
-## How to use
+## How to Use
 
 Firstly, clone the repository. Since a submodule is used ([iutest](https://github.com/srz-zumix/iutest)), recursive cloning is necessary.
 ```bash
@@ -56,7 +56,7 @@ make test-bri
 	<dt>br_index_naive.hpp</dt>
 	<dd>Naive implementation of br-index. All samples p,j,d,pR,jR,dR,len are maintained during the search.</dd>
 	<dt>br_index.hpp</dt>
-	<dd>Simplified implementation of br-index (default). Only samples necessary for _locate_ (j,d,len) are maintained.</dd>
+	<dd>Simplified implementation of br-index (default). Only samples necessary for locate (j,d,len) are maintained.</dd>
 </dl>
 
 ## 実装方針(仮) in 日本語
