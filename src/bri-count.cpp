@@ -83,16 +83,7 @@ void count_all(ifstream& in, string patterns)
             p += c;
         }
 
-        idx.reset_pattern();
-        range_t range{1,0};
-        
-        for (ulint j = 0; j < m; ++j)
-        {
-            range = idx.right_extension((uchar)p[j]);
-            if (range.first > range.second) break;
-        }
-
-        occ_tot += (range.second + 1) - range.first;
+        occ_tot += idx.count(p);
 
     }
 
@@ -105,11 +96,11 @@ void count_all(ifstream& in, string patterns)
     auto t3 = high_resolution_clock::now();
 
     ulint load = duration_cast<milliseconds>(t2-t1).count();
-    cout << "Load time: " << load << " milliseconds" << endl;
+    cout << "Load time  : " << load << " milliseconds" << endl;
 
     ulint search = duration_cast<milliseconds>(t3-t2).count();
     cout << "Number of patterns n = " << n << endl;
-	cout << "Pattern length m = " << m << endl;
+	cout << "Pattern length     m = " << m << endl;
 	cout << "Total number of occurrences  occ_t = " << occ_tot << endl << endl;
 
     cout << "Total time : " << search << " milliseconds" << endl;

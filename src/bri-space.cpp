@@ -18,6 +18,7 @@ int main(int argc, char** argv){
 		help();
 
 	br_index<> idx;
+	cout << "Loading br-index" << endl;
 	idx.load_from_file(argv[1]);
 
 	cout << "--- Statistics of the text and the breakdown of the br-index space usage ---" << endl;

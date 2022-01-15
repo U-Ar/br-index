@@ -14,6 +14,70 @@
 
 namespace bri {
 
+// sample maintained during the search
+struct br_sample_naive {
+    /*
+     * state variables for left_extension & right_extension
+     * range: SA range of P
+     * p: sample pos in SA
+     * j: SA[p]
+     * d: offset between starting position of the pattern & j
+     * rangeR, pR, jR, dR: correspondents to range,p,j,d in SA^R
+     * len: current pattern length
+     */
+    range_t range, rangeR;
+    ulint p, j, d, pR, jR, dR, len;
+    
+    br_sample_naive(): range(), rangeR() {}
+
+    br_sample_naive(range_t range_, 
+              range_t rangeR_,
+              ulint p_,
+              ulint j_,
+              ulint d_,
+              ulint pR_,
+              ulint jR_,
+              ulint dR_,
+              ulint len_) 
+              :
+              range(range_),
+              rangeR(rangeR_),
+              p(p_),
+              j(j_),
+              d(d_),
+              pR(pR_),
+              jR(jR_),
+              dR(dR_),
+              len(len_) {}
+
+    void set_values(range_t range_, 
+                    range_t rangeR_,
+                    ulint p_,
+                    ulint j_,
+                    ulint d_,
+                    ulint pR_,
+                    ulint jR_,
+                    ulint dR_,
+                    ulint len_)
+    {
+        range = range_;
+        rangeR = rangeR_;
+        p = p_;
+        j = j_;
+        d = d_;
+        pR = pR_;
+        jR = jR_;
+        dR = dR_;
+        len = len_;
+    }
+
+    // the pattern does not exist
+    bool is_invalid()
+    {
+        return (range.first > range.second) || (rangeR.first > rangeR.second);
+    }
+};
+
 template<
     class sparse_bitvector_t = sparse_sd_vector,
     class rle_string_t = rle_string_sd 
@@ -80,7 +144,7 @@ public:
             }
         }
 
-        std::cout << "done." << std::endl << std::endl;
+        std::cout << "done." << std::endl;
         std::cout << "(2/4) Building BWT, BWT^R, PLCP and computing SA samples";
         if (sais) std::cout << " (SA-SAIS) ... " << std::flush;
         else std::cout << " (DIVSUFSORT) ... " << std::flush;
@@ -315,7 +379,6 @@ public:
 
         std::cout << " done. " << std::endl << std::endl;
 
-        reset_pattern();
     }
 
     /*
@@ -498,22 +561,175 @@ public:
     }
 
     /*
-     * return current BWT/BWT^R range 
+     * get a sample corresponding to an empty string
      */
-    range_t get_current_range(bool reversed = false)
+    br_sample_naive get_initial_sample()
     {
+        return br_sample_naive(full_range(), // entire SA range
+                               full_range(), // entire SAR range
+                               0,            // p = 0
+                               bwt_size()-1, // SA[0] = n - 1
+                               0,            // offset 0
+                               0,
+                               0,
+                               0,
+                               0);           // null pattern
+    }
 
-        if (!reversed) return range;
-        return rangeR;
+    /*
+     * search the pattern cP (P:the current pattern)
+     * returns SA range corresponding to cP
+     * 
+     * assumes c is original char (not remapped)
+     */
+    br_sample_naive left_extension(uchar c, br_sample_naive const& prev_sample)
+    {
+        // replace c with internal representation
+        c = remap[c];
 
+        br_sample_naive sample(prev_sample);
+
+        // get SA range of cP
+        sample.range = LF(prev_sample.range,c);
+
+        // pattern cP was not found
+        if (sample.range.first > sample.range.second) return sample;
+
+        // accumulated occ of aP (for any a s.t. a < c)
+        ulint acc = 0;
+
+        for (ulint a = 1; a < c; ++a)
+        {
+            range_t smaller_range = LF(prev_sample.range,(uchar)a);
+            acc += (smaller_range.second+1) - smaller_range.first;
+        }
+
+        // get SAR range of (cP)^R
+        sample.rangeR.second = sample.rangeR.first + acc + sample.range.second - sample.range.first;
+        sample.rangeR.first = sample.rangeR.first + acc;
+
+        // cP and aP occurs for some a s.t. a != c
+        if (prev_sample.range.second - prev_sample.range.first != 
+            sample.range.second      - sample.range.first)
+        {
+            // fint last c in range and get its sample
+            // there must be at least one c due to the previous if clause
+            ulint rnk = bwt.rank(prev_sample.range.second+1,c);
+            assert(rnk > 0);
+
+            // update p by corresponding BWT position
+            sample.p = bwt.select(rnk-1,c);
+            assert(sample.p >= prev_sample.range.first && sample.p <= prev_sample.range.second);
+
+            // run number of position p
+            ulint run_of_p = bwt.run_of_position(sample.p);
+
+            // update j by SA[p]
+            if (bwt[prev_sample.range.second] == c)
+                sample.j = samples_first[run_of_p];
+            else
+                sample.j = samples_last[run_of_p];
+
+            // reset d
+            sample.d = 0;
+
+            // lex order in SAR of position j
+            sample.pR = inv_order[run_of_p];
+
+            // SAR[pR]
+            sample.jR = bwt.size()-2-sample.j;
+
+            // reset dR
+            sample.dR = sample.len;
+        }
+        else // only c precedes P 
+        {
+            sample.d++;
+        }
+        sample.len++;
+        return sample;
+    }
+
+    /*
+     * search the pattern Pc (P:the current pattern)
+     * return SA range corresponding to Pc
+     * 
+     * assumes c is original char (not remapped)
+     */
+    br_sample_naive right_extension(uchar c, br_sample_naive const& prev_sample)
+    {
+        // replace c with internal representation
+        c = remap[c];
+
+        br_sample_naive sample(prev_sample);
+
+        // get SAR range of Pc
+        sample.rangeR = LFR(prev_sample.rangeR,c);
+
+        // pattern Pc was not found
+        if (sample.rangeR.first > sample.rangeR.second) return sample;
+
+        // accumulated occ of Pa (for any a s.t. a < c)
+        ulint acc = 0;
+
+        for (ulint a = 1; a < c; ++a)
+        {
+            range_t smaller_rangeR = LFR(prev_sample.rangeR,(uchar)a);
+            acc += (smaller_rangeR.second+1) - smaller_rangeR.first;
+        }
+
+        // get SA range of Pc
+        sample.range.second = sample.range.first + acc + sample.rangeR.second - sample.rangeR.first; 
+        sample.range.first = sample.range.first + acc;
+
+        // Pc and Pa occurs for some a s.t. a != c
+        if (prev_sample.rangeR.second - prev_sample.rangeR.first != 
+            sample.rangeR.second      - sample.rangeR.first)
+        {
+            // fint last c in range and get its sample
+            // there must be at least one c due to the previous if clause
+            ulint rnk = bwtR.rank(prev_sample.rangeR.second+1,c);
+            assert(rnk > 0);
+
+            // update pR by corresponding BWTR position
+            sample.pR = bwtR.select(rnk-1,c);
+            assert(sample.pR >= prev_sample.rangeR.first && sample.pR <= prev_sample.rangeR.second);
+
+            // run number of position pR
+            ulint run_of_pR = bwtR.run_of_position(sample.pR);
+
+            // update jR by SAR[pR]
+            if (bwtR[prev_sample.rangeR.second] == c)
+                sample.jR = samples_firstR[run_of_pR];
+            else
+                sample.jR = samples_lastR[run_of_pR];
+
+            // reset dR
+            sample.dR = 0;
+
+            // lex order in SA of position jR
+            sample.p = inv_orderR[run_of_pR];
+
+            // SA[p]
+            sample.j = bwt.size()-2-sample.jR;
+
+            // reset d
+            sample.d = sample.len;
+        }
+        else 
+        {
+            sample.dR++;
+        }
+        sample.len++;
+        return sample;
     }
 
     /*
      * count occurrences of current pattern P
      */
-    ulint count()
+    ulint count_sample(br_sample_naive const& sample)
     {
-        return (range.second + 1) - range.first;
+        return (sample.range.second + 1) - sample.range.first;
     }
 
     /*
@@ -521,17 +737,17 @@ public:
      * return them as std::vector
      * (space comsuming if result is big)
      */
-    std::vector<ulint> locate()
+    std::vector<ulint> locate_sample(br_sample_naive const& sample)
     {
-        assert(j >= d);
+        assert(sample.j >= sample.d);
 
-        ulint sa = j - d;
+        ulint sa = sample.j - sample.d;
         ulint pos = sa;
 
         std::deque<ulint> deq;
         deq.push_back(pos);
 
-        while (plcp[pos] >= len) 
+        while (plcp[pos] >= sample.len) 
         {
             pos = Phi(pos);
             deq.push_front(pos);
@@ -541,7 +757,7 @@ public:
         {
             if (pos == last_SA_val) break;
             pos = PhiI(pos);
-            if (plcp[pos] < len) break;
+            if (plcp[pos] < sample.len) break;
             deq.push_back(pos);
         }
 
@@ -549,182 +765,44 @@ public:
     }
 
     /*
-     * reset the current searched pattern P
+     * count the number of a given pattern
      */
-    void reset_pattern()
+    ulint count(std::string const& pattern)
     {
-        // entire SA range
-        range = full_range();
-        // lex order 0
-        p = 0;
-        // SA[0] = n - 1
-        j = bwt_size() - 1;
-        // offset 0
-        d = 0;
-
-        // entire SAR range
-        rangeR = full_range();
-        // reversed sample is initialized with 0 (not used instantly)
-        pR = jR = dR = 0;
-
-        // null pattern
-        len = 0;
+        br_sample_naive sample(get_initial_sample());
+        for (size_t i = 0; i < pattern.size(); ++i)
+        {
+            sample = right_extension(pattern[i],sample);
+            if (sample.is_invalid()) return {};
+        }
+        return count_sample(sample);
     }
 
     /*
-     * get the length of current searched pattern P
+     * locate occurrences of a given pattern
      */
-    ulint pattern_length()
+    std::vector<ulint> locate(std::string const& pattern, bool right=true)
     {
-        return len;
-    }
-
-    /*
-     * search the pattern cP (P:the current pattern)
-     * returns SA range corresponding to cP
-     * 
-     * assumes c is original char (not remapped)
-     */
-    range_t left_extension(uchar c)
-    {
-        // replace c with internal representation
-        c = remap[c];
-
-        range_t prev_range(range);
-
-        // get SA range of cP
-        range = LF(range,c);
-
-        // pattern cP was not found
-        if (range.first > range.second) return {1,0};
-
-        // accumulated occ of aP (for any a s.t. a < c)
-        ulint acc = 0;
-
-        for (ulint a = 1; a < c; ++a)
+        if (right) 
         {
-            range_t smaller_range = LF(prev_range,(uchar)a);
-            acc += (smaller_range.second+1) - smaller_range.first;
-        }
-
-        // get SAR range of (cP)^R
-        rangeR.second = rangeR.first + acc + range.second - range.first;
-        rangeR.first = rangeR.first + acc;
-
-        // cP and aP occurs for some a s.t. a != c
-        if (prev_range.second-prev_range.first != 
-            range.second-range.first)
-        {
-            // fint last c in range and get its sample
-            // there must be at least one c due to the previous if clause
-            ulint rnk = bwt.rank(prev_range.second+1,c);
-            assert(rnk > 0);
-
-            // update p by corresponding BWT position
-            p = bwt.select(rnk-1,c);
-            assert(p >= prev_range.first && p <= prev_range.second);
-
-            // run number of position p
-            ulint run_of_p = bwt.run_of_position(p);
-
-            // update j by SA[p]
-            if (bwt[prev_range.second] == c)
-                j = samples_first[run_of_p];
-            else
-                j = samples_last[run_of_p];
-
-            // reset d
-            d = 0;
-
-            // lex order in SAR of position j
-            pR = inv_order[run_of_p];
-
-            // SAR[pR]
-            jR = bwt.size()-2-j;
-
-            // reset dR
-            dR = len;
-        }
-        else // only c precedes P 
-        {
-            d++;
-        }
-        len++;
-        return range;
-    }
-
-    /*
-     * search the pattern Pc (P:the current pattern)
-     * return SA range corresponding to Pc
-     * 
-     * assumes c is original char (not remapped)
-     */
-    range_t right_extension(uchar c)
-    {
-        // replace c with internal representation
-        c = remap[c];
-
-        range_t prev_rangeR(rangeR);
-
-        // get SAR range of Pc
-        rangeR = LFR(rangeR,c);
-
-        // pattern Pc was not found
-        if (rangeR.first > rangeR.second) return {1,0};
-
-        // accumulated occ of Pa (for any a s.t. a < c)
-        ulint acc = 0;
-
-        for (ulint a = 1; a < c; ++a)
-        {
-            range_t smaller_rangeR = LFR(prev_rangeR,(uchar)a);
-            acc += (smaller_rangeR.second+1) - smaller_rangeR.first;
-        }
-
-        // get SA range of Pc
-        range.second = range.first + acc + rangeR.second - rangeR.first; 
-        range.first = range.first + acc;
-
-        // Pc and Pa occurs for some a s.t. a != c
-        if (prev_rangeR.second-prev_rangeR.first != 
-            rangeR.second-rangeR.first)
-        {
-            // fint last c in range and get its sample
-            // there must be at least one c due to the previous if clause
-            ulint rnk = bwtR.rank(prev_rangeR.second+1,c);
-            assert(rnk > 0);
-
-            // update pR by corresponding BWTR position
-            pR = bwtR.select(rnk-1,c);
-            assert(pR >= prev_rangeR.first && pR <= prev_rangeR.second);
-
-            // run number of position pR
-            ulint run_of_pR = bwtR.run_of_position(pR);
-
-            // update jR by SAR[pR]
-            if (bwtR[prev_rangeR.second] == c)
-                jR = samples_firstR[run_of_pR];
-            else
-                jR = samples_lastR[run_of_pR];
-
-            // reset dR
-            dR = 0;
-
-            // lex order in SA of position jR
-            p = inv_orderR[run_of_pR];
-
-            // SA[p]
-            j = bwt.size()-2-jR;
-
-            // reset d
-            d = len;
+            br_sample_naive sample(get_initial_sample());
+            for (size_t i = 0; i < pattern.size(); ++i)
+            {
+                sample = right_extension(pattern[i],sample);
+                if (sample.is_invalid()) return {};
+            }
+            return locate_sample(sample);
         }
         else 
         {
-            dR++;
+            br_sample_naive sample(get_initial_sample());
+            for (size_t i = 0; i < pattern.size(); ++i)
+            {
+                sample = left_extension(pattern[pattern.size()-1-i],sample);
+                if (sample.is_invalid()) return {};
+            }
+            return locate_sample(sample);
         }
-        len++;
-        return range;
     }
 
     /*
@@ -1138,21 +1216,6 @@ private:
 
     // needed for determining the end of locate
     permuted_lcp<> plcp;
-
-    /*
-     * state variables for left_extension & right_extension
-     * range: SA range of P
-     * p: sample pos in SA
-     * j: SA[p]
-     * d: offset between starting position of the pattern & j
-     * rangeR, pR, jR, dR: correspondents to range,p,j,d in SA^R
-     * len: current pattern length
-     */
-    range_t range;
-    ulint p, j, d;
-    range_t rangeR;
-    ulint pR, jR, dR;
-    ulint len;
 
 };
 

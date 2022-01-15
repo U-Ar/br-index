@@ -110,40 +110,21 @@ void locate_all(ifstream& in, string patterns)
             p += c;
         }
 
-        idx.reset_pattern();
-        range_t range{1,0};
+        vector<ulint> occs = idx.locate(p);
 
-        
-        for (ulint j = 0; j < m; ++j)
-        {
-            range = idx.right_extension((uchar)p[j]);
-            if (range.first > range.second) break;
-        }
-        /*
-        for (int j = m-1; j >= 0; --j)
-        {
-            range = idx.left_extension((uchar)p[j]);
-            if (range.first > range.second) break;
-        }*/
-
-        vector<ulint> occs;
-
-        if (range.first <= range.second) occs = idx.locate();
-
-        occ_tot += (range.second + 1) - range.first;
+        occ_tot += occs.size();
 
         if (c) // check occurrences
         {
-            cout << "pattern length: " << idx.pattern_length() << endl;
-            cout << "occ by LF     : " << (range.second + 1) - range.first <<  "   range by LF: [" << range.first << "," << range.second << "]"<< endl;
-            cout << "occ by locate : " << occs.size() << endl;
+            cout << "pattern length: " << m << endl;
+            cout << "occ by locate : " << occ_tot << endl;
             for (auto o : occs)
             {
                 if (text.substr(o,p.size()).compare(p) != 0) 
                 {
                     cout << "Error: wrong occurrence:  " << o << endl;
                     cout << "       original pattern:  " << p << endl;
-                    cout << "   1 + wrong    pattern: " << text.substr(o-1,p.size()+1) << endl;
+                    cout << "       wrong    pattern: "  << text.substr(o,p.size()) << endl;
                 }
             }
         }
@@ -158,11 +139,11 @@ void locate_all(ifstream& in, string patterns)
     auto t3 = high_resolution_clock::now();
 
     ulint load = duration_cast<milliseconds>(t2-t1).count();
-    cout << "Load time: " << load << " milliseconds" << endl;
+    cout << "Load time  : " << load << " milliseconds" << endl;
 
     ulint search = duration_cast<milliseconds>(t3-t2).count();
     cout << "Number of patterns n = " << n << endl;
-	cout << "Pattern length m = " << m << endl;
+	cout << "Pattern length     m = " << m << endl;
 	cout << "Total number of occurrences  occ_t = " << occ_tot << endl << endl;
 
     cout << "Total time : " << search << " milliseconds" << endl;

@@ -161,11 +161,11 @@ public:
 
         auto bytes = ones.serialize(out);
         tot_bytes += bytes;
-        std::cout << "- bitvector ones: " << bytes << "bytes" << std::endl;
+        std::cout << "- bitvector ones: " << bytes << " bytes" << std::endl;
 
         bytes = zeros.serialize(out);
         tot_bytes += bytes;
-        std::cout << "- bitvector zeros: " << bytes << "bytes" << std::endl;
+        std::cout << "- bitvector zeros: " << bytes << " bytes" << std::endl;
 
         return tot_bytes;
     }

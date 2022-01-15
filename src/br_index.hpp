@@ -127,7 +127,7 @@ public:
             }
         }
 
-        std::cout << "done." << std::endl << std::endl;
+        std::cout << "done." << std::endl;
         std::cout << "(2/4) Building BWT, BWT^R, PLCP and computing SA samples";
         if (sais) std::cout << " (SA-SAIS) ... " << std::flush;
         else std::cout << " (DIVSUFSORT) ... " << std::flush;
@@ -329,7 +329,6 @@ public:
 
         std::cout << " done. " << std::endl << std::endl;
 
-        reset_pattern();
     }
 
     /*
@@ -697,9 +696,9 @@ public:
     }
 
     /*
-     * locate occurrences of a given pattern
+     * count the number of a given pattern
      */
-    std::vector<ulint> locate(std::string const& pattern)
+    ulint count(std::string const& pattern)
     {
         br_sample sample(get_initial_sample());
         for (size_t i = 0; i < pattern.size(); ++i)
@@ -707,7 +706,34 @@ public:
             sample = right_extension(pattern[i],sample);
             if (sample.is_invalid()) return {};
         }
-        return locate_sample(sample);
+        return count_sample(sample);
+    }
+
+    /*
+     * locate occurrences of a given pattern
+     */
+    std::vector<ulint> locate(std::string const& pattern, bool right=true)
+    {
+        if (right) 
+        {
+            br_sample sample(get_initial_sample());
+            for (size_t i = 0; i < pattern.size(); ++i)
+            {
+                sample = right_extension(pattern[i],sample);
+                if (sample.is_invalid()) return {};
+            }
+            return locate_sample(sample);
+        }
+        else 
+        {
+            br_sample sample(get_initial_sample());
+            for (size_t i = 0; i < pattern.size(); ++i)
+            {
+                sample = left_extension(pattern[pattern.size()-1-i],sample);
+                if (sample.is_invalid()) return {};
+            }
+            return locate_sample(sample);
+        }
     }
 
     /*
