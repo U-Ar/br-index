@@ -2,7 +2,7 @@
 
 ## About
 
-This repository implements __bi-directional__ r-index (br-index).
+This repository implements the __bi-directional__ r-index (_br-index_).
 
 The r-index is a compressed text index which supports count(P) and locate(P).
 Its size is O(r) words, whose r is the number of equal-letter runs in BWT of the text.
@@ -34,13 +34,13 @@ make
 5 executables will be created in the _build_ directory.
 <dl>
 	<dt>bri-build</dt>
-	<dd>builds br-index on input text file.</dd>
+	<dd>builds the br-index on the input text file.</dd>
 	<dt>bri-count</dt>
 	<dd>counts the number of occurrences of the given pattern using the index.</dd>
 	<dt>bri-locate</dt>
 	<dd>locates the occurrences of the given pattern using the index.</dd>
 	<dt>bri-space</dt>
-	<dd>shows the index size.</dd>
+	<dd>shows the statistics of the text and the breakdown of the index space usage.</dd>
 	<dt>run_tests</dt>
 	<dd>runs unit tests.</dd>
 </dl>
@@ -54,7 +54,7 @@ make test-bri
 
 <dl>
 	<dt>br_index_naive.hpp</dt>
-	<dd>Naive implementation of br-index. All samples p,j,d,pR,jR,dR,len are maintained during the search.</dd>
-	<dt>br_index.hpp</dt>
-	<dd>Simplified implementation of br-index (default). Only samples necessary for locate (j,d,len) are maintained.</dd>
+	<dd>The naive implementation of br-index. All the variables p,j,d,pR,jR,dR,len are maintained during the search. Not space-efficient, implemented mostly for an educational purpose.</dd>
+	<dt>br_index.hpp (default)</dt>
+	<dd>The simplified implementation of br-index. Only the variables necessary for locate (j,d,len) are maintained.</dd>
 </dl>
