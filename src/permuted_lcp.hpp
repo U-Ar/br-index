@@ -157,14 +157,15 @@ public:
         ulint tot_bytes = 0;
 
         std::ofstream out("/dev/null");
+        std::cout << "space for permuted_lcp:" << std::endl;
 
         auto bytes = ones.serialize(out);
         tot_bytes += bytes;
-        std::cout << "PLCP ones bitvector: " << bytes << std::endl;
+        std::cout << "- bitvector ones: " << bytes << "bytes" << std::endl;
 
         bytes = zeros.serialize(out);
         tot_bytes += bytes;
-        std::cout << "PLCP zeros bitvector: " << bytes << std::endl;
+        std::cout << "- bitvector zeros: " << bytes << "bytes" << std::endl;
 
         return tot_bytes;
     }

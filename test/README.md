@@ -18,3 +18,4 @@ make test-bri
 - RleStringTest
 - PermutedLcpTest
 - BrIndexTest
+- BrIndexNaiveTest

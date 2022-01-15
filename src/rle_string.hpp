@@ -328,19 +328,21 @@ public:
 
         ulint tot_bytes = 0;
 
+        std::cout << "space for run-length encoded string:" << std::endl;
+
         std::ofstream out("/dev/null");
         auto bytesize = runs.serialize(out);
         tot_bytes += bytesize;
-        std::cout << "main runs bitvector: " << bytesize << " bytes" << std::endl;
+        std::cout << "- bitvector runs: " << bytesize << " bytes" << std::endl;
 
         bytesize = 0;
         for (auto r: runs_per_letter) bytesize += r.serialize(out);
         tot_bytes += bytesize;
-        std::cout << "runs-per-letter bitvectors: " << bytesize << " bytes" << std::endl;
+        std::cout << "- bitvectors runs-per-letter: " << bytesize << " bytes" << std::endl;
 
         bytesize = run_heads.serialize(out);
         tot_bytes += bytesize;
-        std::cout << "run heads: " << bytesize << " bytes" << std::endl;
+        std::cout << "- run heads: " << bytesize << " bytes" << std::endl;
 
         return tot_bytes;
 

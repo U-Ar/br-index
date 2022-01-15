@@ -1,5 +1,5 @@
-#ifndef BRI_UTILS_HPP
-#define BRI_UTILS_HPP
+#ifndef INCLUDED_BRI_UTILS_HPP
+#define INCLUDED_BRI_UTILS_HPP
 
 #include "definitions.hpp"
 

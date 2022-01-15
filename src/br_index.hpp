@@ -1,8 +1,6 @@
 /*
- * bidirectional r-index
- * 
- * created: 2021/12/22
- * author : U-Ar
+ * bi-directional r-index 
+ *  the simpler implementation
  */
 
 #ifndef INCLUDED_BR_INDEX_HPP
@@ -47,28 +45,50 @@ public:
 
         }
 
-        if (contains_reserved_chars(input))
-        {
-
-            std::cout << "Error: input string contains one of the reserved characters 0x, 0x1" << std::endl;
-            exit(1);
-        
-        }
-
         std::cout << "Text length = " << input.size() << std::endl << std::endl;
 
-        std::cout << "(1/3) Building BWT, BWT^R and computing SA samples";
-        if (sais) std::cout << " (SA-SAIS) ... " << std::flush;
-        else std::cout << " (DIVSUFSORT) ... " << std::flush;
-
+        std::cout << "(1/4) Remapping alphabet ... " << std::flush;
+        
         // build RLBWT
 
         // configure & build indexes for sufsort & plcp
         sdsl::cache_config cc;
 
+        // remap alphabet
+        remap = std::vector<uchar>(256,0);
+        remap_inv = std::vector<uchar>(256,0);
+        {
+            sigma = 1;
+            std::vector<ulint> freqs(256,0);
+            for (size_t i = 0; i < input.size(); ++i)
+            {
+                if (freqs[(uchar)input[i]]++ == 0) sigma++;
+                if (sigma >= 255)
+                {
+                    std::cout << "Error: alphabet cannot be remapped (overflow)" << std::endl;
+                    exit(1);
+                }
+            }
+            uchar new_c = 2; // avoid reserved chars
+            for (ulint c = 2; c < 256; ++c)
+            {
+                if (freqs[(uchar)c] != 0)
+                {
+                    remap[(uchar)c] = new_c;
+                    remap_inv[new_c++] = (uchar)c;
+                }
+            }
+        }
+
+        std::cout << "done." << std::endl << std::endl;
+        std::cout << "(2/4) Building BWT, BWT^R, PLCP and computing SA samples";
+        if (sais) std::cout << " (SA-SAIS) ... " << std::flush;
+        else std::cout << " (DIVSUFSORT) ... " << std::flush;
+
+        // remap input text
         sdsl::int_vector<8> text(input.size());
-        for (ulint i = 0; i < input.size(); ++i)
-            text[i] = (uchar)input[i];
+        for (size_t i = 0; i < input.size(); ++i)
+            text[i] = remap[(uchar)input[i]];
 
         sdsl::append_zero_symbol(text);
 
@@ -101,7 +121,7 @@ public:
 
         sdsl::int_vector<8> textR(input.size());
         for (ulint i = 0; i < input.size(); ++i)
-            textR[i] = (uchar)input[input.size()-1-i];
+            textR[i] = remap[(uchar)input[input.size()-1-i]];
 
         sdsl::append_zero_symbol(textR);
 
@@ -116,6 +136,7 @@ public:
 
         sdsl::int_vector_buffer<> saR(sdsl::cache_file_name(sdsl::conf::KEY_SA, ccR));
         auto bwt_and_samplesR = sufsort(textR,saR);
+
         // plcp is not needed in the reversed case
 
         // remove cache of textR and SAR
@@ -134,7 +155,7 @@ public:
         std::vector<range_t>& samples_first_vecR = std::get<1>(bwt_and_samplesR);
         std::vector<range_t>& samples_last_vecR = std::get<2>(bwt_and_samplesR);
 
-        std::cout << "done.\n(2/3) Run length encoding BWT ... " << std::flush;
+        std::cout << "done.\n(3/4) Run-length encoding BWT ... " << std::flush;
 
 
         // run length compression on BWT and BWTR
@@ -186,12 +207,12 @@ public:
         std::cout << "Number of BWT equal-letter runs: r = " << r << std::endl;
 		std::cout << "Rate n/r = " << double(bwt.size())/r << std::endl;
 		std::cout << "log2(r) = " << std::log2(double(r)) << std::endl;
-		std::cout << "log2(n/r) = " << std::log2(double(bwt.size())/r) << std::endl << std::endl;
+		std::cout << "log2(n/r) = " << std::log2(double(bwt.size())/r) << std::endl;
 
         std::cout << "Number of BWT^R equal-letter runs: rR = " << rR << std::endl << std::endl;
 
         // Phi, Phi inverse is needed only in forward case
-        std::cout << "(3/3) Building Phi/Phi^{-1} function ..." << std::flush;
+        std::cout << "(4/4) Building predecessor for toehold lemma & Phi/Phi^{-1} function ..." << std::flush;
 
         
         samples_last = sdsl::int_vector<>(r,0,log_n);
@@ -274,7 +295,7 @@ public:
 
     /*
      * rn: BWT range of a string P
-     * c:  character
+     * c:  remapped character
      * returns: BWT range of cP
      */
     range_t LF(range_t rn, uchar c)
@@ -296,7 +317,7 @@ public:
 
     /*
      * rn: BWT^R range of a string P
-     * c:  character
+     * c:  remapped character
      * returns: BWT^R range of cP
      */
     range_t LFR(range_t rn, uchar c)
@@ -425,10 +446,12 @@ public:
     }
 
     /*
-     * return BWT range of character c
+     * return BWT range of original char c (not remapped)
      */
     range_t get_char_range(uchar c)
     {
+        // replace c with internal representation
+        c = remap[c];
 
         if ((c == 255 && F[c] == bwt_size()) || F[c] >= F[c+1]) return {1,0};
 
@@ -522,9 +545,14 @@ public:
     /*
      * search the pattern cP (P:the current pattern)
      * returns SA range corresponding to cP
+     * 
+     * assumes c is original char (not remapped)
      */
     range_t left_extension(uchar c)
     {
+        // replace c with internal representation
+        c = remap[c];
+
         range_t prev_range(range);
 
         // get SA range of cP
@@ -536,7 +564,7 @@ public:
         // accumulated occ of aP (for any a s.t. a < c)
         ulint acc = 0;
 
-        for (ulint a = 0; a < c; ++a)
+        for (ulint a = 1; a < c; ++a)
         {
             range_t smaller_range = LF(prev_range,(uchar)a);
             acc += (smaller_range.second+1) - smaller_range.first;
@@ -583,9 +611,14 @@ public:
     /*
      * search the pattern Pc (P:the current pattern)
      * return SA range corresponding to Pc
+     * 
+     * assumes c is original char (not remapped)
      */
     range_t right_extension(uchar c)
     {
+        // replace c with internal representation
+        c = remap[c];
+
         range_t prev_rangeR(rangeR);
 
         // get SAR range of Pc
@@ -597,7 +630,7 @@ public:
         // accumulated occ of Pa (for any a s.t. a < c)
         ulint acc = 0;
 
-        for (ulint a = 0; a < c; ++a)
+        for (ulint a = 1; a < c; ++a)
         {
             range_t smaller_rangeR = LFR(prev_rangeR,(uchar)a);
             acc += (smaller_rangeR.second+1) - smaller_rangeR.first;
@@ -647,8 +680,8 @@ public:
      */
     uchar bwt_at(ulint i, bool reversed = false)
     {
-        if (!reversed) return bwt[i];
-        return bwtR[i];
+        if (!reversed) return remap_inv[bwt[i]];
+        return remap_inv[bwtR[i]];
     }
 
     /*
@@ -674,20 +707,38 @@ public:
      */
     std::string get_bwt(bool reversed = false)
     {
-        if (!reversed) return bwt.to_string();
-        return bwtR.to_string();
+        if (!reversed)
+        {
+            std::string res(bwt.to_string());
+            for (size_t i = 0; i < res.size(); ++i)
+                res[i] = remap_inv[(uchar)res[i]];
+            return res;
+        } else {
+            std::string res(bwtR.to_string());
+            for (size_t i = 0; i < res.size(); ++i)
+                res[i] = remap_inv[(uchar)res[i]];
+            return res;
+        }
     }
 
     uint serialize(std::ostream& out)
     {
         ulint w_bytes = 0;
 
+        out.write((char*)&sigma,sizeof(sigma));
+
+        out.write((char*)remap.data(),256*sizeof(uchar));
+        out.write((char*)remap_inv.data(),256*sizeof(uchar));
+
         out.write((char*)&terminator_position,sizeof(terminator_position));
         out.write((char*)&terminator_positionR,sizeof(terminator_positionR));
         out.write((char*)&last_SA_val,sizeof(last_SA_val));
         out.write((char*)F.data(),256*sizeof(ulint));
 
-        w_bytes += sizeof(terminator_position)
+        w_bytes += sizeof(sigma)
+                   + 256*sizeof(uchar)
+                   + 256*sizeof(uchar)
+                   + sizeof(terminator_position)
                    + sizeof(terminator_positionR)
                    + sizeof(last_SA_val)
                    + 256*sizeof(ulint);
@@ -715,6 +766,13 @@ public:
 
     void load(std::istream& in)
     {
+
+        in.read((char*)&sigma,sizeof(sigma));
+
+        remap = std::vector<uchar>(256);
+        in.read((char*)remap.data(),256*sizeof(uchar));
+        remap_inv = std::vector<uchar>(256);
+        in.read((char*)remap_inv.data(),256*sizeof(uchar));
         
         in.read((char*)&terminator_position,sizeof(terminator_position));
         in.read((char*)&terminator_positionR,sizeof(terminator_positionR));
@@ -781,15 +839,27 @@ public:
     /*
      * get statistics
      */
-    ulint print_space() {
-        std::cout << "Number of runs in bwt : " << bwt.number_of_runs() << std::endl;
-        std::cout << "Numbef of runs in bwtR: " << bwtR.number_of_runs() << std::endl << std::endl;
-        ulint tot_bytes = bwt.print_space();
+    ulint print_space() 
+    {
+
+        std::cout << "text length           : " << bwt.size() << std::endl;
+        std::cout << "alphabet size         : " << sigma << std::endl;
+        std::cout << "number of runs in bwt : " << bwt.number_of_runs() << std::endl;
+        std::cout << "numbef of runs in bwtR: " << bwtR.number_of_runs() << std::endl << std::endl;
+        
+        ulint tot_bytes = sizeof(sigma)
+                        + 256*sizeof(uchar)
+                        + 256*sizeof(uchar)
+                        + sizeof(terminator_position)
+                        + sizeof(terminator_positionR)
+                        + sizeof(last_SA_val)
+                        + 256*sizeof(ulint);
+        
+        tot_bytes += bwt.print_space();
         tot_bytes += bwtR.print_space();
-        std::cout << "\ntotal BWT space: " << tot_bytes << " bytes" << std::endl << std::endl;
+        std::cout << "total space for BWT: " << tot_bytes << " bytes" << std::endl << std::endl;
 
         tot_bytes += plcp.print_space();
-        std::cout << std::endl;
 
         std::ofstream out("/dev/null");
 
@@ -798,41 +868,43 @@ public:
         
         bytes =  samples_first.serialize(out);
         tot_bytes += bytes;
-        std::cout << "samples_first: " << bytes << std::endl;
+        std::cout << "samples_first: " << bytes << " bytes" << std::endl;
 
         bytes =  samples_last.serialize(out);
         tot_bytes += bytes;
-        std::cout << "samples_last: " << bytes << std::endl;
+        std::cout << "samples_last: " << bytes << " bytes" << std::endl;
 
 
         bytes =  first.serialize(out);
         tot_bytes += bytes;
-        std::cout << "first: " << bytes << std::endl;
+        std::cout << "first: " << bytes << " bytes" << std::endl;
 
         bytes =  first_to_run.serialize(out);
         tot_bytes += bytes;
-        std::cout << "first_to_run: " << bytes << std::endl;
+        std::cout << "first_to_run: " << bytes << " bytes" << std::endl;
 
 
         bytes =  last.serialize(out);
         tot_bytes += bytes;
-        std::cout << "last: " << bytes << std::endl;
+        std::cout << "last: " << bytes << " bytes" << std::endl;
 
         bytes =  last_to_run.serialize(out);
         tot_bytes += bytes;
-        std::cout << "last_to_run: " << bytes << std::endl;
+        std::cout << "last_to_run: " << bytes << " bytes" << std::endl;
 
 
         bytes =  samples_firstR.serialize(out);
         tot_bytes += bytes;
-        std::cout << "samples_firstR: " << bytes << std::endl;
+        std::cout << "samples_firstR: " << bytes << " bytes" << std::endl;
 
         bytes =  samples_lastR.serialize(out);
         tot_bytes += bytes;
-        std::cout << "samples_lastR: " << bytes << std::endl;
+        std::cout << "samples_lastR: " << bytes << " bytes" << std::endl;
 
+        std::cout << "<total space of br-index>: " << tot_bytes << " bytes" << std::endl << std::endl;
 
         return tot_bytes;
+
     }
 
     /*
@@ -840,7 +912,16 @@ public:
      */
     ulint get_space()
     {
-        ulint tot_bytes = bwt.get_space();
+
+        ulint tot_bytes = sizeof(sigma)
+                        + 256*sizeof(uchar)
+                        + 256*sizeof(uchar)
+                        + sizeof(terminator_position)
+                        + sizeof(terminator_positionR)
+                        + sizeof(last_SA_val)
+                        + 256*sizeof(ulint);
+
+        tot_bytes += bwt.get_space();
         tot_bytes += bwtR.get_space();
 
         tot_bytes += plcp.get_space();
@@ -860,6 +941,7 @@ public:
         tot_bytes += samples_lastR.serialize(out);
 
         return tot_bytes;
+
     }
 
 private:
@@ -934,15 +1016,6 @@ private:
             (bwt_s, samples_first, samples_last);
     }
 
-    static bool contains_reserved_chars(std::string const& s)
-    {
-        for (auto c: s)
-        {
-            if (c == 0 || c == 1) return true;
-        }
-        return false;
-    }
-
     static const uchar TERMINATOR = 1;
 
     bool sais = true;
@@ -950,13 +1023,22 @@ private:
     /*
      * sparse RLBWT for text & textR
      */
+
+    // alphabet remapper
+    std::vector<uchar> remap;
+    std::vector<uchar> remap_inv;
+    ulint sigma;
+
+    // accumulated number of characters in lex order
     std::vector<ulint> F;
     
+    // RLBWT
     rle_string_t bwt;
     ulint terminator_position = 0;
     ulint last_SA_val = 0;
     ulint r = 0;
 
+    // RLBWT^R
     rle_string_t bwtR;
     ulint terminator_positionR = 0;
     ulint rR = 0;
@@ -977,11 +1059,12 @@ private:
     sdsl::int_vector<> samples_firstR;
     sdsl::int_vector<> samples_lastR;
 
+    // needed for determining the end of locate
     permuted_lcp<> plcp;
 
     /*
      * state variables for left_extension & right_extension
-     * range: BWT range of P
+     * range: SA range of P
      * j: SA[p]
      * d: offset between starting position of the pattern & j
      * rangeR: correspondents to range in reversed text
