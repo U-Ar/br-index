@@ -54,7 +54,10 @@ make test-bri
 
 <dl>
 	<dt>br_index_naive.hpp</dt>
-	<dd>The naive implementation of br-index. All the variables p,j,d,pR,jR,dR,len are maintained during the search. Not space-efficient, implemented mostly for an educational purpose.</dd>
+	<dd>The naive implementation of br-index. All the variables <i>p,j,d,pR,jR,dR,len</i> are maintained during the search. Not space-efficient, implemented mostly for the educational purpose and the possible future use.</dd>
 	<dt>br_index.hpp (default)</dt>
-	<dd>The simplified implementation of br-index. Only the variables necessary for locate (j,d,len) are maintained.</dd>
+	<dd>The simplified implementation of br-index. Only the variables necessary for locate <i>(j,d,len)</i> are maintained, which are sufficient to compute <i>locate.</i></dd>
 </dl>
+
+## Notes
+- count and locate can be carried out by just the r-index. Use bri-count and bri-locate for only verification. Now implementing the more complex query, which the r-index cannot execute. 

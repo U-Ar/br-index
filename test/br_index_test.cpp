@@ -194,7 +194,6 @@ IUTEST(BrIndexTest, DNALikeTextLocate)
 }
 
 
-
 // tests for br_index_naive (same as tests for br_index)
 
 
