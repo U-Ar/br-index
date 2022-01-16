@@ -39,7 +39,7 @@ make
 	<dd>Builds the br-index on the input text file.</dd>
 	<dt>bri-locate</dt>
 	<dd>Locates the occurrences of the given pattern using the index. Provide a pattern file in 
-	the <a href="https://pizzachili.dcc.uchile.cl/experiments.html">Pizza&Chili format</a>.You can give an option "-m (number)" for the number of mismatched characters allowed (0,1,2 are supported, 0 by default).</dd>
+	the <a href="https://pizzachili.dcc.uchile.cl/experiments.html">Pizza&Chili format</a>. You can give an option "-m (number)" for the number of mismatched characters allowed (0,1,2 are supported, 0 by default).</dd>
 	<dt>bri-count</dt>
 	<dd>Counts the number of the occurrences of the given pattern using the index. Its usage is same as bri-locate.</dd>
 	<dt>bri-space</dt>
@@ -63,4 +63,4 @@ make test-bri
 </dl>
 
 ## Notes
-- count and locate can be carried out by just the r-index. Use bri-count and bri-locate for only verification, since they are practically meaningless. Now implementing the more complex query, which the r-index cannot execute. 
+- count and locate can be carried out by just the r-index. The br-index shows the better performances when the allowed number of mismatches is big. Now implemented up to 2 as a reference, but 3 or more can be implemented in similar ways. 
