@@ -7,11 +7,15 @@
 using namespace bri;
 using namespace std;
 
+long allowed = 0;
+
 void help()
 {
-	cout << "bri-count: count the number of occurrences of the input patterns." << endl << endl;
+	cout << "bri-count: count the number of occurrences of the input patterns" << endl;
+    cout << "            allowing some mismatched characters."                 << endl << endl;
 
-	cout << "Usage: bri-count <index> <patterns>" << endl;
+	cout << "Usage: bri-count [options] <index> <patterns>" << endl;
+    cout << "   -m <number>  max number of mismatched characters allowed (supported: 0,1,2 (0 by default))" << endl;
 	cout << "   <index>      index file (with extension .bri)" << endl;
 	cout << "   <patterns>   file in pizza&chili format containing the patterns." << endl;
 	exit(0);
@@ -24,8 +28,29 @@ void parse_args(char** argv, int argc, int &ptr){
 	string s(argv[ptr]);
 	ptr++;
 
-    cout << "Error: unknown option " << s << endl;
-    help();
+    if(s.compare("-m")==0){
+
+        if(ptr>=argc-1){
+            cout << "Error: missing parameter after -m option." << endl;
+            help();
+        }
+
+        char* e;
+        allowed = strtol(argv[ptr],&e,10);
+
+        if(*e != '\0' || allowed < 0 || allowed > 2){
+            cout << "Error: invalid value not 0, 1, 2 after -m option." << endl;
+            help();
+        }
+
+        ptr++;
+
+	}else{
+
+        cout << "Error: unknown option " << s << endl;
+        help();
+
+    }
 }
 
 
@@ -48,7 +73,7 @@ void count_all(ifstream& in, string patterns)
 
     auto t2 = high_resolution_clock::now();
 
-    cout << "searching patterns ... " << endl;
+    cout << "searching patterns with mismatches fewer than " << allowed << " ... " << endl;
     ifstream ifs(patterns);
 
     //read header of the pizza&chilli input file
@@ -62,6 +87,7 @@ void count_all(ifstream& in, string patterns)
 
     ulint last_perc = 0;
 
+    ulint occ0 = 0, occ1 = 0, occ2 = 0;
     ulint occ_tot = 0;
 
     // extract patterns from file and search them in the index
@@ -83,7 +109,23 @@ void count_all(ifstream& in, string patterns)
             p += c;
         }
 
-        occ_tot += idx.count(p);
+        // exact match
+        ulint o0 = idx.count(p);
+        occ0 += o0;
+        occ_tot += o0;
+
+        if (allowed < 1) continue;
+
+        // approximate match with 1 miss
+        ulint o1 = idx.count1(p);
+        occ1 += o1;
+        occ_tot += o1;
+
+        if (allowed < 2) continue;
+
+        ulint o2 = idx.count2(p);
+        occ2 += o2;
+        occ_tot += o2;
 
     }
 
@@ -101,7 +143,16 @@ void count_all(ifstream& in, string patterns)
     ulint search = duration_cast<milliseconds>(t3-t2).count();
     cout << "Number of patterns n = " << n << endl;
 	cout << "Pattern length     m = " << m << endl;
-	cout << "Total number of occurrences  occ_t = " << occ_tot << endl << endl;
+    cout << "Occurrences with 0 mismatch   occ0 = " << occ0 << endl;
+    if (allowed >= 1)
+    {
+        cout << "Occurrences with 1 mismatch   occ1 = " << occ1 << endl;
+        if (allowed >= 2)
+        {
+            cout << "Occurrences with 2 mismatches occ2 = " << occ2 << endl;
+        }
+    }
+	cout << "Total number of occurrences   occt = " << occ_tot << endl << endl;
 
     cout << "Total time : " << search << " milliseconds" << endl;
 	cout << "Search time: " << (double)search/n << " milliseconds/pattern (total: " << n << " patterns)" << endl;
