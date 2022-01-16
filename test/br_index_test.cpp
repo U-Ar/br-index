@@ -22,7 +22,7 @@ void print_range(range_t rg)
     " 2nd val: " << rg.second << std::endl;
 }
 
-IUTEST(BrIndexTest, BasicExtension)
+IUTEST(BrIndexTest, BasicLocate)
 {
     std::string s("aaaaaaaaaaaaaaaaaaaa");
     br_index<> idx(s);
@@ -32,26 +32,28 @@ IUTEST(BrIndexTest, BasicExtension)
     IUTEST_ASSERT_EQ(20,range.second);
     IUTEST_ASSERT_EQ(0,range.first);
 
-    idx.reset_pattern();
-    range = idx.left_extension('a');
-    IUTEST_ASSERT_EQ(20,range.second);
-    IUTEST_ASSERT_EQ(1,range.first);
-    std::vector<ulint> res = idx.locate();
+    std::vector<ulint> res = idx.locate("a");
     IUTEST_ASSERT_EQ(20,res.size());
+    std::sort(res.begin(),res.end());
     for (ulint i = 0; i < res.size(); ++i)
     {
-        IUTEST_ASSERT_EQ(19-i,res[i]);
+        IUTEST_ASSERT_EQ(i,res[i]);
     }
 
-    idx.reset_pattern();
-    range = idx.right_extension('a');
-    IUTEST_ASSERT_EQ(20,range.second);
-    IUTEST_ASSERT_EQ(1,range.first);
-    res = idx.locate();
-    IUTEST_ASSERT_EQ(20,res.size());
+    res = idx.locate("aa");
+    IUTEST_ASSERT_EQ(19,res.size());
+    std::sort(res.begin(),res.end());
     for (ulint i = 0; i < res.size(); ++i)
     {
-        IUTEST_ASSERT_EQ(19-i,res[i]);
+        IUTEST_ASSERT_EQ(i,res[i]);
+    }
+
+    res = idx.locate("aa",false);
+    IUTEST_ASSERT_EQ(19,res.size());
+    std::sort(res.begin(),res.end());
+    for (ulint i = 0; i < res.size(); ++i)
+    {
+        IUTEST_ASSERT_EQ(i,res[i]);
     }
 }
 
@@ -59,65 +61,18 @@ IUTEST(BrIndexTest, PeriodicTextLocate)
 {
     std::string s("abcdabcdabcdabcdhello");
     br_index<> idx(s);
-    idx.reset_pattern();
-    idx.right_extension('a');
-    idx.right_extension('b');
-    idx.right_extension('c');
-    range_t range = idx.right_extension('d');
-    IUTEST_ASSERT_EQ(4,range.second-range.first+1);
-    auto vec = idx.locate();
-    std::cout << "right ex only" << std::endl;
-    print_vec<>(vec);
+    auto vec = idx.locate("abcd");
+    std::sort(vec.begin(),vec.end());
     IUTEST_ASSERT_EQ(0,vec[0]);
     IUTEST_ASSERT_EQ(4,vec[1]);
     IUTEST_ASSERT_EQ(8,vec[2]);
     IUTEST_ASSERT_EQ(12,vec[3]);
-
-
-    idx.reset_pattern();
-    idx.left_extension('d');
-    idx.left_extension('c');
-    idx.left_extension('b');
-    range = idx.left_extension('a');
-    IUTEST_ASSERT_EQ(4,range.second-range.first+1);
-    vec = idx.locate();
-    std::cout << "left ex only" << std::endl;
-    print_vec<>(vec);
+    vec = idx.locate("abcd",false);
+    std::sort(vec.begin(),vec.end());
     IUTEST_ASSERT_EQ(0,vec[0]);
     IUTEST_ASSERT_EQ(4,vec[1]);
     IUTEST_ASSERT_EQ(8,vec[2]);
     IUTEST_ASSERT_EQ(12,vec[3]);
-
-
-    idx.reset_pattern();
-    range = idx.left_extension('b');
-    range = idx.right_extension('c');
-    range = idx.left_extension('a');
-    range = idx.right_extension('d');
-    IUTEST_EXPECT_EQ(4,range.second-range.first+1);
-    vec = idx.locate();
-    std::cout << "right and left mixed" << std::endl;
-    print_vec<>(vec);
-    IUTEST_EXPECT_EQ(0,vec[0]);
-    IUTEST_EXPECT_EQ(4,vec[1]);
-    IUTEST_EXPECT_EQ(8,vec[2]);
-    IUTEST_EXPECT_EQ(12,vec[3]);
-
-
-    idx.reset_pattern();
-    range = idx.right_extension('c');
-    range = idx.left_extension('b');
-    range = idx.right_extension('d');
-    range = idx.left_extension('a');
-    IUTEST_EXPECT_EQ(4,idx.pattern_length());
-    IUTEST_EXPECT_EQ(4,range.second-range.first+1);
-    vec = idx.locate();
-    std::cout << "right and left mixed2" << std::endl;
-    print_vec<>(vec);
-    IUTEST_EXPECT_EQ(0,vec[0]);
-    IUTEST_EXPECT_EQ(4,vec[1]);
-    IUTEST_EXPECT_EQ(8,vec[2]);
-    IUTEST_EXPECT_EQ(12,vec[3]);
 
 }
 
@@ -163,10 +118,8 @@ IUTEST(BrIndexTest, DNALikeTextLocate)
 {
     std::string s("AAAATGCCGCCGCCATAAA");
     br_index<> idx(s);
-    idx.reset_pattern();
 
-    idx.left_extension('C');
-    auto vec = idx.locate();
+    auto vec = idx.locate("C");
     std::sort(vec.begin(),vec.end());
     print_vec<>(vec);
     IUTEST_EXPECT_EQ(6,vec[0]);
@@ -176,16 +129,29 @@ IUTEST(BrIndexTest, DNALikeTextLocate)
     IUTEST_EXPECT_EQ(12,vec[4]);
     IUTEST_EXPECT_EQ(13,vec[5]);
 
-    idx.left_extension('C');
-    vec = idx.locate();
+    vec = idx.locate("CC");
     std::sort(vec.begin(),vec.end());
     print_vec<>(vec);
     IUTEST_EXPECT_EQ(6,vec[0]);
     IUTEST_EXPECT_EQ(9,vec[1]);
     IUTEST_EXPECT_EQ(12,vec[2]);
 
-    idx.left_extension('G');
-    vec = idx.locate();
+    vec = idx.locate("CC",false);
+    std::sort(vec.begin(),vec.end());
+    print_vec<>(vec);
+    IUTEST_EXPECT_EQ(6,vec[0]);
+    IUTEST_EXPECT_EQ(9,vec[1]);
+    IUTEST_EXPECT_EQ(12,vec[2]);
+
+
+    vec = idx.locate("GCC");
+    std::sort(vec.begin(),vec.end());
+    print_vec<>(vec);
+    IUTEST_EXPECT_EQ(5,vec[0]);
+    IUTEST_EXPECT_EQ(8,vec[1]);
+    IUTEST_EXPECT_EQ(11,vec[2]);
+
+    vec = idx.locate("GCC",false);
     std::sort(vec.begin(),vec.end());
     print_vec<>(vec);
     IUTEST_EXPECT_EQ(5,vec[0]);
@@ -193,11 +159,84 @@ IUTEST(BrIndexTest, DNALikeTextLocate)
     IUTEST_EXPECT_EQ(11,vec[2]);
 }
 
+IUTEST(BrIndexTest, BasicLocate1)
+{
+    std::vector<ulint> vec;
+    std::string s("aaaaaaaaaa");
+    br_index<> idx(s);
+    vec = idx.locate1("aaa");
+    IUTEST_EXPECT_EQ(0,vec.size());
+    vec = idx.locate1("bbb");
+    IUTEST_EXPECT_EQ(0,vec.size());
+    vec = idx.locate1("bba");
+    IUTEST_EXPECT_EQ(0,vec.size());
+    vec = idx.locate1("bab");
+    IUTEST_EXPECT_EQ(0,vec.size());
+    vec = idx.locate1("abb");
+    IUTEST_EXPECT_EQ(0,vec.size());
 
-// tests for br_index_naive (same as tests for br_index)
+    vec = idx.locate1("baa");
+    IUTEST_EXPECT_EQ(8,vec.size());
+    std::sort(vec.begin(),vec.end());
+    for (ulint i = 0; i < vec.size(); ++i)
+        IUTEST_EXPECT_EQ(i,vec[i]);
+
+    vec = idx.locate1("aba");
+    IUTEST_EXPECT_EQ(8,vec.size());
+    std::sort(vec.begin(),vec.end());
+    for (ulint i = 0; i < vec.size(); ++i)
+        IUTEST_EXPECT_EQ(i,vec[i]);
+
+    vec = idx.locate1("baa");
+    IUTEST_EXPECT_EQ(8,vec.size());
+    std::sort(vec.begin(),vec.end());
+    for (ulint i = 0; i < vec.size(); ++i)
+        IUTEST_EXPECT_EQ(i,vec[i]);
+
+}
+
+IUTEST(BrIndexTest, BasicLocate2)
+{
+    std::vector<ulint> vec;
+    std::string s("aaaaaaaaaa");
+    br_index<> idx(s);
+    vec = idx.locate2("aaa");
+    IUTEST_EXPECT_EQ(0,vec.size());
+    vec = idx.locate2("baa");
+    IUTEST_EXPECT_EQ(0,vec.size());
+    vec = idx.locate2("aba");
+    IUTEST_EXPECT_EQ(0,vec.size());
+    vec = idx.locate2("aab");
+    IUTEST_EXPECT_EQ(0,vec.size());
+    vec = idx.locate2("bbb");
+    IUTEST_EXPECT_EQ(0,vec.size());
+    vec = idx.locate2("bba");
+    IUTEST_EXPECT_EQ(8,vec.size());
+    std::sort(vec.begin(),vec.end());
+    for (ulint i = 0; i < vec.size(); ++i)
+        IUTEST_EXPECT_EQ(i,vec[i]);
+    vec = idx.locate2("bab");
+    IUTEST_EXPECT_EQ(8,vec.size());
+    std::sort(vec.begin(),vec.end());
+    for (ulint i = 0; i < vec.size(); ++i)
+        IUTEST_EXPECT_EQ(i,vec[i]);
+    vec = idx.locate2("abb");
+    IUTEST_EXPECT_EQ(8,vec.size());
+    std::sort(vec.begin(),vec.end());
+    for (ulint i = 0; i < vec.size(); ++i)
+        IUTEST_EXPECT_EQ(i,vec[i]);
+
+}
 
 
-IUTEST(BrIndexNaiveTest, BasicExtension)
+
+/*
+ * below: tests for br_index_naive (same as tests for br_index)
+ */
+
+
+
+IUTEST(BrIndexNaiveTest, BasicLocate)
 {
     std::string s("aaaaaaaaaaaaaaaaaaaa");
     br_index_naive<> idx(s);
@@ -207,88 +246,49 @@ IUTEST(BrIndexNaiveTest, BasicExtension)
     IUTEST_ASSERT_EQ(20,range.second);
     IUTEST_ASSERT_EQ(0,range.first);
 
-    idx.reset_pattern();
-    range = idx.left_extension('a');
-    IUTEST_ASSERT_EQ(20,range.second);
-    IUTEST_ASSERT_EQ(1,range.first);
-    std::vector<ulint> res = idx.locate();
+    std::vector<ulint> res = idx.locate("a");
     IUTEST_ASSERT_EQ(20,res.size());
+    std::sort(res.begin(),res.end());
     for (ulint i = 0; i < res.size(); ++i)
     {
-        IUTEST_ASSERT_EQ(19-i,res[i]);
+        IUTEST_ASSERT_EQ(i,res[i]);
     }
 
-    idx.reset_pattern();
-    range = idx.right_extension('a');
-    IUTEST_ASSERT_EQ(20,range.second);
-    IUTEST_ASSERT_EQ(1,range.first);
-    res = idx.locate();
-    IUTEST_ASSERT_EQ(20,res.size());
+    res = idx.locate("aa");
+    IUTEST_ASSERT_EQ(19,res.size());
+    std::sort(res.begin(),res.end());
     for (ulint i = 0; i < res.size(); ++i)
     {
-        IUTEST_ASSERT_EQ(19-i,res[i]);
+        IUTEST_ASSERT_EQ(i,res[i]);
+    }
+
+    res = idx.locate("aa",false);
+    IUTEST_ASSERT_EQ(19,res.size());
+    std::sort(res.begin(),res.end());
+    for (ulint i = 0; i < res.size(); ++i)
+    {
+        IUTEST_ASSERT_EQ(i,res[i]);
     }
 }
+
 
 IUTEST(BrIndexNaiveTest, PeriodicTextLocate)
 {
     std::string s("abcdabcdabcdabcdhello");
     br_index_naive<> idx(s);
-    idx.reset_pattern();
-    idx.right_extension('a');
-    idx.right_extension('b');
-    idx.right_extension('c');
-    range_t range = idx.right_extension('d');
-    IUTEST_ASSERT_EQ(4,range.second-range.first+1);
-    auto vec = idx.locate();
-    std::cout << "right ex only" << std::endl;
+    auto vec = idx.locate("abcd");
+    std::sort(vec.begin(),vec.end());
     IUTEST_ASSERT_EQ(0,vec[0]);
     IUTEST_ASSERT_EQ(4,vec[1]);
     IUTEST_ASSERT_EQ(8,vec[2]);
     IUTEST_ASSERT_EQ(12,vec[3]);
 
-
-    idx.reset_pattern();
-    idx.left_extension('d');
-    idx.left_extension('c');
-    idx.left_extension('b');
-    range = idx.left_extension('a');
-    IUTEST_ASSERT_EQ(4,range.second-range.first+1);
-    vec = idx.locate();
-    std::cout << "left ex only" << std::endl;
+    vec = idx.locate("abcd",false);
+    std::sort(vec.begin(),vec.end());
     IUTEST_ASSERT_EQ(0,vec[0]);
     IUTEST_ASSERT_EQ(4,vec[1]);
     IUTEST_ASSERT_EQ(8,vec[2]);
     IUTEST_ASSERT_EQ(12,vec[3]);
-
-
-    idx.reset_pattern();
-    range = idx.left_extension('b');
-    range = idx.right_extension('c');
-    range = idx.left_extension('a');
-    range = idx.right_extension('d');
-    IUTEST_EXPECT_EQ(4,range.second-range.first+1);
-    vec = idx.locate();
-    std::cout << "right and left mixed" << std::endl;
-    IUTEST_EXPECT_EQ(0,vec[0]);
-    IUTEST_EXPECT_EQ(4,vec[1]);
-    IUTEST_EXPECT_EQ(8,vec[2]);
-    IUTEST_EXPECT_EQ(12,vec[3]);
-
-
-    idx.reset_pattern();
-    range = idx.right_extension('c');
-    range = idx.left_extension('b');
-    range = idx.right_extension('d');
-    range = idx.left_extension('a');
-    IUTEST_EXPECT_EQ(4,idx.pattern_length());
-    IUTEST_EXPECT_EQ(4,range.second-range.first+1);
-    vec = idx.locate();
-    std::cout << "right and left mixed2" << std::endl;
-    IUTEST_EXPECT_EQ(0,vec[0]);
-    IUTEST_EXPECT_EQ(4,vec[1]);
-    IUTEST_EXPECT_EQ(8,vec[2]);
-    IUTEST_EXPECT_EQ(12,vec[3]);
 
 }
 
@@ -334,11 +334,10 @@ IUTEST(BrIndexNaiveTest, DNALikeTextLocate)
 {
     std::string s("AAAATGCCGCCGCCATAAA");
     br_index_naive<> idx(s);
-    idx.reset_pattern();
 
-    idx.left_extension('C');
-    auto vec = idx.locate();
+    auto vec = idx.locate("C");
     std::sort(vec.begin(),vec.end());
+    print_vec<>(vec);
     IUTEST_EXPECT_EQ(6,vec[0]);
     IUTEST_EXPECT_EQ(7,vec[1]);
     IUTEST_EXPECT_EQ(9,vec[2]);
@@ -346,19 +345,102 @@ IUTEST(BrIndexNaiveTest, DNALikeTextLocate)
     IUTEST_EXPECT_EQ(12,vec[4]);
     IUTEST_EXPECT_EQ(13,vec[5]);
 
-    idx.left_extension('C');
-    vec = idx.locate();
+    vec = idx.locate("CC");
     std::sort(vec.begin(),vec.end());
+    print_vec<>(vec);
     IUTEST_EXPECT_EQ(6,vec[0]);
     IUTEST_EXPECT_EQ(9,vec[1]);
     IUTEST_EXPECT_EQ(12,vec[2]);
 
-    idx.left_extension('G');
-    vec = idx.locate();
+    vec = idx.locate("CC",false);
     std::sort(vec.begin(),vec.end());
+    print_vec<>(vec);
+    IUTEST_EXPECT_EQ(6,vec[0]);
+    IUTEST_EXPECT_EQ(9,vec[1]);
+    IUTEST_EXPECT_EQ(12,vec[2]);
+
+
+    vec = idx.locate("GCC");
+    std::sort(vec.begin(),vec.end());
+    print_vec<>(vec);
     IUTEST_EXPECT_EQ(5,vec[0]);
     IUTEST_EXPECT_EQ(8,vec[1]);
     IUTEST_EXPECT_EQ(11,vec[2]);
 
+    vec = idx.locate("GCC",false);
+    std::sort(vec.begin(),vec.end());
+    print_vec<>(vec);
+    IUTEST_EXPECT_EQ(5,vec[0]);
+    IUTEST_EXPECT_EQ(8,vec[1]);
+    IUTEST_EXPECT_EQ(11,vec[2]);
+}
+
+
+IUTEST(BrIndexNaiveTest, BasicLocate1)
+{
+    std::vector<ulint> vec;
+    std::string s("aaaaaaaaaa");
+    br_index_naive<> idx(s);
+    vec = idx.locate1("aaa");
+    IUTEST_EXPECT_EQ(0,vec.size());
+    vec = idx.locate1("bbb");
+    IUTEST_EXPECT_EQ(0,vec.size());
+    vec = idx.locate1("bba");
+    IUTEST_EXPECT_EQ(0,vec.size());
+    vec = idx.locate1("bab");
+    IUTEST_EXPECT_EQ(0,vec.size());
+    vec = idx.locate1("abb");
+    IUTEST_EXPECT_EQ(0,vec.size());
+
+    vec = idx.locate1("baa");
+    IUTEST_EXPECT_EQ(8,vec.size());
+    std::sort(vec.begin(),vec.end());
+    for (ulint i = 0; i < vec.size(); ++i)
+        IUTEST_EXPECT_EQ(i,vec[i]);
+
+    vec = idx.locate1("aba");
+    IUTEST_EXPECT_EQ(8,vec.size());
+    std::sort(vec.begin(),vec.end());
+    for (ulint i = 0; i < vec.size(); ++i)
+        IUTEST_EXPECT_EQ(i,vec[i]);
+
+    vec = idx.locate1("baa");
+    IUTEST_EXPECT_EQ(8,vec.size());
+    std::sort(vec.begin(),vec.end());
+    for (ulint i = 0; i < vec.size(); ++i)
+        IUTEST_EXPECT_EQ(i,vec[i]);
+
+}
+
+IUTEST(BrIndexNaiveTest, BasicLocate2)
+{
+    std::vector<ulint> vec;
+    std::string s("aaaaaaaaaa");
+    br_index_naive<> idx(s);
+    vec = idx.locate2("aaa");
+    IUTEST_EXPECT_EQ(0,vec.size());
+    vec = idx.locate2("baa");
+    IUTEST_EXPECT_EQ(0,vec.size());
+    vec = idx.locate2("aba");
+    IUTEST_EXPECT_EQ(0,vec.size());
+    vec = idx.locate2("aab");
+    IUTEST_EXPECT_EQ(0,vec.size());
+    vec = idx.locate2("bbb");
+    IUTEST_EXPECT_EQ(0,vec.size());
+    vec = idx.locate2("bba");
+    IUTEST_EXPECT_EQ(8,vec.size());
+    std::sort(vec.begin(),vec.end());
+    for (ulint i = 0; i < vec.size(); ++i)
+        IUTEST_EXPECT_EQ(i,vec[i]);
+    vec = idx.locate2("bab");
+    IUTEST_EXPECT_EQ(8,vec.size());
+    std::sort(vec.begin(),vec.end());
+    for (ulint i = 0; i < vec.size(); ++i)
+        IUTEST_EXPECT_EQ(i,vec[i]);
+    vec = idx.locate2("abb");
+    IUTEST_EXPECT_EQ(8,vec.size());
+    std::sort(vec.begin(),vec.end());
+    for (ulint i = 0; i < vec.size(); ++i)
+        IUTEST_EXPECT_EQ(i,vec[i]);
 
 }
