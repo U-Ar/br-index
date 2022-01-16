@@ -96,7 +96,7 @@ void locate_all(ifstream& in, string patterns)
 
     auto t2 = high_resolution_clock::now();
 
-    cout << "searching patterns with mismatches fewer than " << allowed << " ... " << endl;
+    cout << "searching patterns with mismatches at most " << allowed << " ... " << endl;
     ifstream ifs(patterns);
 
     //read header of the pizza&chilli input file

@@ -9,6 +9,7 @@ def print_help():
     print("    <text>  text file")
     print("    <n>     number of generated patterns")
     print("    <m>     length of patterns")
+    print("    <patt>  output filename (<text>.patt by default)")
 
 
 if __name__ == "__main__":
@@ -18,17 +19,20 @@ if __name__ == "__main__":
     textfile = sys.argv[1]
     n = int(sys.argv[2])
     m = int(sys.argv[3])
+    
+    outputfile = textfile + ".patt"
+    if len(sys.argv) == 5:
+        outputfile = sys.argv[4]
 
     print("read {}".format(textfile))
 
     text = ""
-    with open(textfile,"r") as f:
+    with open(textfile,"r", encoding = "ISO-8859-1") as f:
         text = f.read()
 
-    outputfile = textfile + ".patt"
     print("write to {}".format(outputfile))
 
-    with open(outputfile,"w") as f:
+    with open(outputfile,"w", encoding = "ISO-8859-1") as f:
         f.write("# number={} length={} file={}\n".format(n,m,textfile))
         for i in range(n):
             r = random.randint(0,len(text)-m)

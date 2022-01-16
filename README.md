@@ -18,7 +18,7 @@ The br-index we have proposed is achieved by using the mechanism of the r-index 
 - This project is based on [sdsl-lite](https://github.com/simongog/sdsl-lite) library.
 Install sdsl-lite beforehand and modify variables SDSL_INCLUDE and SDSL_LIB in _CMakeLists.txt_.
 
-- This project has been tested under gcc 7.5.0.
+- This project has been tested under gcc 4.8.5 and gcc 7.5.0.
 
 ## How to Use
 
@@ -63,4 +63,4 @@ make test-bri
 </dl>
 
 ## Notes
-- count and locate can be carried out by just the r-index. The br-index shows the better performances when the allowed number of mismatches is big. Now implemented up to 2 as a reference, but 3 or more can be implemented in similar ways. 
+- count and locate can be carried out by just the r-index. The br-index shows the better performance when the allowed number of mismatches is big. Now implemented up to 2 as a reference, but 3 or more can be implemented in similar ways. 
