@@ -4,8 +4,9 @@ import random
 def print_help():
     print("-- Pizza&Chili format pattern file generator --")
     print("Randomly extracts substrings from a text file, and save <text>.patt")
+    print("Encoding is ISO-8859-1 by default. Edit it as you need.")
     print()
-    print("Usage: python generate_patterns.py <text> <n> <m>")
+    print("Usage: python generate_patterns.py <text> <n> <m> [<patt>]")
     print("    <text>  text file")
     print("    <n>     number of generated patterns")
     print("    <m>     length of patterns")

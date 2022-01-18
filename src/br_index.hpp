@@ -519,18 +519,30 @@ public:
     /*
      * get a sample corresponding to an empty string
      */
-    br_sample get_initial_sample()
+    br_sample get_initial_sample(bool right=true)
     {
-        return br_sample(full_range(), // entire SA range
-                         full_range(), // entire SAR range
-                         bwt_size()-1, // SA[0] = n - 1
-                         0,            // offset 0
-                         0);           // null pattern
+        if (!right) {
+            return br_sample(full_range(), // entire SA range
+                            full_range(), // entire SAR range
+                            (samples_last[r-1]+1) % bwt.size(), // arbitrary sample
+                            0,            // offset 0
+                            0);           // null pattern
+        }
+        else 
+        {
+            return br_sample(full_range(), // entire SA range
+                            full_range(), // entire SAR range
+                            (samples_lastR[rR-1]+1) % bwtR.size(), // arbitrary sample
+                            0,            // offset 0
+                            0);           // null pattern
+        }
     }
 
     /*
      * search the pattern cP (P:the current pattern)
-     * returns SA range corresponding to cP
+     * returns SA&SAR range corresponding to cP
+     * 
+     * full version, update ranges for SA and SAR simultaneously
      * 
      * assumes c is original char (not remapped)
      */
@@ -545,25 +557,25 @@ public:
         sample.range = LF(prev_sample.range,c);
 
         // pattern cP was not found
-        if (sample.range.first > sample.range.second) return sample;
-
-        // accumulated occ of aP (for any a s.t. a < c)
-        ulint acc = 0;
-
-        for (ulint a = 1; a < c; ++a)
-        {
-            range_t smaller_range = LF(prev_sample.range,(uchar)a);
-            acc += (smaller_range.second+1) - smaller_range.first;
-        }
-
-        // get SAR range of (cP)^R
-        sample.rangeR.second = sample.rangeR.first + acc + sample.range.second - sample.range.first;
-        sample.rangeR.first = sample.rangeR.first + acc;
+        if (sample.is_invalid()) return sample;
 
         // cP and aP occurs for some a s.t. a != c
         if (prev_sample.range.second - prev_sample.range.first != 
             sample.range.second      - sample.range.first)
         {
+            
+            // accumulated occ of aP (for any a s.t. a < c)
+            ulint acc = 0;
+            for (ulint a = 1; a < c; ++a)
+            {
+                range_t smaller_range = LF(prev_sample.range,(uchar)a);
+                acc += (smaller_range.second+1) - smaller_range.first;
+            }
+            // get SAR range of (cP)^R
+            sample.rangeR.second = sample.rangeR.first + acc + sample.range.second - sample.range.first;
+            sample.rangeR.first = sample.rangeR.first + acc;
+
+
             // fint last c in range and get its sample
             // there must be at least one c due to the previous if clause
             ulint rnk = bwt.rank(prev_sample.range.second+1,c);
@@ -588,6 +600,7 @@ public:
         }
         else // only c precedes P 
         {
+            // increment offset by 1
             sample.d++;
         }
         sample.len++;
@@ -596,7 +609,9 @@ public:
 
     /*
      * search the pattern Pc (P:the current pattern)
-     * return SA range corresponding to Pc
+     * return SAR&SA range corresponding to Pc
+     * 
+     * full version, updates ranges for SAR and SA simultaneously
      * 
      * assumes c is original char (not remapped)
      */
@@ -611,25 +626,25 @@ public:
         sample.rangeR = LFR(prev_sample.rangeR,c);
 
         // pattern Pc was not found
-        if (sample.rangeR.first > sample.rangeR.second) return sample;
-
-        // accumulated occ of Pa (for any a s.t. a < c)
-        ulint acc = 0;
-
-        for (ulint a = 1; a < c; ++a)
-        {
-            range_t smaller_rangeR = LFR(prev_sample.rangeR,(uchar)a);
-            acc += (smaller_rangeR.second+1) - smaller_rangeR.first;
-        }
-
-        // get SA range of Pc
-        sample.range.second = sample.range.first + acc + sample.rangeR.second - sample.rangeR.first; 
-        sample.range.first = sample.range.first + acc;
+        if (sample.is_invalid()) return sample;
 
         // Pc and Pa occurs for some a s.t. a != c
         if (prev_sample.rangeR.second - prev_sample.rangeR.first != 
             sample.rangeR.second      - sample.rangeR.first)
         {
+
+            // accumulated occ of Pa (for any a s.t. a < c)
+            ulint acc = 0;
+            for (ulint a = 1; a < c; ++a)
+            {
+                range_t smaller_rangeR = LFR(prev_sample.rangeR,(uchar)a);
+                acc += (smaller_rangeR.second+1) - smaller_rangeR.first;
+            }
+            // get SA range of Pc
+            sample.range.second = sample.range.first + acc + sample.rangeR.second - sample.rangeR.first; 
+            sample.range.first = sample.range.first + acc;
+
+
             // fint last c in range and get its sample
             // there must be at least one c due to the previous if clause
             ulint rnk = bwtR.rank(prev_sample.rangeR.second+1,c);
@@ -651,12 +666,11 @@ public:
             // reset d
             sample.d = sample.len;
         }
-        /* only c follows P
-        else 
+        /*else // only c follows P
         {
-            sample.dR++;
-        }
-        */
+            // increment offset by 1, unncecessary for locate
+            sample.dR++; 
+        }*/
         sample.len++;
         return sample;
     }
@@ -734,15 +748,28 @@ public:
     /*
      * count the number of a given pattern
      */
-    ulint count(std::string const& pattern)
+    ulint count(std::string const& pattern, bool right=false)
     {
-        br_sample sample(get_initial_sample());
-        for (size_t i = 0; i < pattern.size(); ++i)
+        if (right) 
         {
-            sample = right_extension(pattern[i],sample);
-            if (sample.is_invalid()) return {};
+            br_sample sample(get_initial_sample(true));
+            for (size_t i = 0; i < pattern.size(); ++i)
+            {
+                sample = right_only(pattern[i],sample);
+                if (sample.is_invalid()) return {};
+            }
+            return count_sample(sample);
         }
-        return count_sample(sample);
+        else 
+        {
+            br_sample sample(get_initial_sample());
+            for (size_t i = 0; i < pattern.size(); ++i)
+            {
+                sample = left_only(pattern[pattern.size()-1-i],sample);
+                if (sample.is_invalid()) return {};
+            }
+            return count_sample(sample);
+        }
     }
 
     /*
@@ -752,7 +779,7 @@ public:
     {
         ulint m = pattern.size();
         ulint x = (m+1)/2;
-        br_sample init_sample(get_initial_sample());
+        br_sample init_sample;
         br_sample sample;
 
         ulint occs = 0;
@@ -760,7 +787,8 @@ public:
         // case A. mismatch occurs in the first half
 
         // first backward search P[x+1...m-1]
-        sample = backward_search(pattern, x+1, m-1, init_sample);
+        init_sample = get_initial_sample();
+        sample = backward_only(pattern, x+1, m-1, init_sample);
 
         if (sample.size() > 0)
         {
@@ -769,7 +797,7 @@ public:
             for (ulint i = x + 1; i-- > 0; )
             {
                 // backward search P[i+1...x]
-                br_sample sample_error(backward_search(pattern, i+1, x, sample));
+                br_sample sample_error(backward_only(pattern, i+1, x, sample));
                 if (sample_error.is_invalid()) continue;
 
                 // select character from alphabet except P[i]
@@ -778,13 +806,13 @@ public:
                     if (c == remap[pattern[i]]) continue;
 
                     // try to extend with the selected character c
-                    br_sample sample_corrected(left_extension(remap_inv[c],sample_error));
+                    br_sample sample_corrected(left_only(remap_inv[c],sample_error));
                     if (sample_corrected.is_invalid()) continue;
 
                     // backward search remaining interval P[0...i-1]
                     if (i != 0) 
                     {
-                        sample_corrected = backward_search(pattern, 0, i-1, sample_corrected);
+                        sample_corrected = backward_only(pattern, 0, i-1, sample_corrected);
                         if (sample_corrected.is_invalid()) continue;
                     }
                     occs += sample_corrected.size();                   
@@ -795,7 +823,8 @@ public:
         // case B. mismatch occurs in the second half
 
         // first forward search P[0...x]
-        sample = forward_search(pattern, 0, x, init_sample);
+        init_sample = get_initial_sample(true);
+        sample = forward_only(pattern, 0, x, init_sample);
 
         if (sample.size() > 0)
         {
@@ -803,7 +832,7 @@ public:
             for (ulint i = x+1; i < m; ++i)
             {
                 // forward search P[x+1,i-1]
-                br_sample sample_error(forward_search(pattern, x+1, i-1, sample));
+                br_sample sample_error(forward_only(pattern, x+1, i-1, sample));
                 if (sample_error.is_invalid()) continue;
 
                 // select character from alphabet except P[i]
@@ -812,11 +841,11 @@ public:
                     if (c == remap[pattern[i]]) continue;
 
                     // try to extend with the selected character c
-                    br_sample sample_corrected(right_extension(remap_inv[c],sample_error));
+                    br_sample sample_corrected(right_only(remap_inv[c],sample_error));
                     if (sample_corrected.is_invalid()) continue;
 
                     // forward search remaining interval P[i+1...m-1]
-                    sample_corrected = forward_search(pattern, i+1, m-1, sample_corrected);
+                    sample_corrected = forward_only(pattern, i+1, m-1, sample_corrected);
                     if (sample_corrected.is_invalid()) continue;
 
                     occs += sample_corrected.size(); 
@@ -838,7 +867,7 @@ public:
         ulint s1 = m/3;
         ulint s2 = m - s1;
 
-        br_sample init_sample(get_initial_sample());
+        br_sample init_sample;
         br_sample sample;
 
         ulint occs = 0;
@@ -856,15 +885,18 @@ public:
 
         // case A. 2 errors in P1 & P2
 
+        init_sample = get_initial_sample();
+
         // backward search P[s2...m-1]
-        sample = backward_search(pattern, s2, m-1, init_sample);
+        sample = backward_only(pattern, s2, m-1, init_sample);
+
         if (sample.size() > 0)
         {
             // choose first mismatched position i
             for (ulint i = s2-1; i > 0; --i)
             {
                 // backward search P[i+1...s2-1]
-                br_sample sample_error1(backward_search(pattern, i+1, s2-1, sample));
+                br_sample sample_error1(backward_only(pattern, i+1, s2-1, sample));
                 if (sample_error1.is_invalid()) continue;
 
                 // select char from alphabet except P[i]
@@ -873,13 +905,13 @@ public:
                     if (c1 == remap[pattern[i]]) continue;
 
                     // try to extend leftward with selected char c1
-                    br_sample sample_corrected1(left_extension(remap_inv[c1], sample_error1));
+                    br_sample sample_corrected1(left_only(remap_inv[c1], sample_error1));
                     if (sample_corrected1.is_invalid()) continue;
 
                     // choose second mismatched position j
                     for (ulint j = i; j-- > 0; )
                     {
-                        br_sample sample_error2(backward_search(pattern, j+1, i-1, sample_corrected1));
+                        br_sample sample_error2(backward_only(pattern, j+1, i-1, sample_corrected1));
                         if (sample_error2.is_invalid()) continue;
 
                         // select character from alphabet except P[j]
@@ -888,13 +920,13 @@ public:
                             if (c2 == remap[pattern[j]]) continue;
 
                             // try to extend leftward with selected char c2
-                            br_sample sample_corrected2(left_extension(remap_inv[c2], sample_error2));
+                            br_sample sample_corrected2(left_only(remap_inv[c2], sample_error2));
                             if (sample_corrected2.is_invalid()) continue;
 
                             if (j != 0)
                             {
                                 // backward search P[0...j-1]
-                                sample_corrected2 = backward_search(pattern, 0, j-1, sample_corrected2);
+                                sample_corrected2 = backward_only(pattern, 0, j-1, sample_corrected2);
                                 if (sample_corrected2.is_invalid()) continue;
                             }
                             
@@ -908,15 +940,18 @@ public:
 
         // case B. 2 errors in P3
 
+        init_sample = get_initial_sample(true);
+
         // forward search P[0...s2-1]
-        sample = forward_search(pattern, 0, s2-1, init_sample);
+        sample = forward_only(pattern, 0, s2-1, init_sample);
+
         if (sample.size() > 0)
         {
             // choose first mismatched position i
             for (ulint i = s2; i <= m-2; ++i)
             {
                 // forward search P[s2...i-1]
-                br_sample sample_error1(forward_search(pattern, s2, i-1, sample));
+                br_sample sample_error1(forward_only(pattern, s2, i-1, sample));
                 if (sample_error1.is_invalid()) continue;
 
                 // select char from alphabet except P[i]
@@ -925,14 +960,14 @@ public:
                     if (c1 == remap[pattern[i]]) continue;
 
                     // try to extend rightward with selected char c1
-                    br_sample sample_corrected1(right_extension(remap_inv[c1],sample_error1));
+                    br_sample sample_corrected1(right_only(remap_inv[c1],sample_error1));
                     if (sample_corrected1.is_invalid()) continue;
 
                     // choose second mismatched position j
                     for (ulint j = i+1; j <= m-1; ++j)
                     {
                         // forward search P[i+1...j-1]
-                        br_sample sample_error2(forward_search(pattern, i+1, j-1, sample_corrected1));
+                        br_sample sample_error2(forward_only(pattern, i+1, j-1, sample_corrected1));
                         if (sample_error2.is_invalid()) continue;
 
                         // select char from alphabet except P[i]
@@ -941,11 +976,11 @@ public:
                             if (c2 == remap[pattern[j]]) continue;
 
                             // try to extend rightward with selected char c2
-                            br_sample sample_corrected2(right_extension(remap_inv[c2],sample_error2));
+                            br_sample sample_corrected2(right_only(remap_inv[c2],sample_error2));
                             if (sample_corrected2.is_invalid()) continue;
 
                             // forward search P[j+1...m-1]
-                            sample_corrected2 = forward_search(pattern, j+1, m-1, sample_corrected2);
+                            sample_corrected2 = forward_only(pattern, j+1, m-1, sample_corrected2);
                             if (sample_corrected2.is_invalid()) continue;
                             
                             occs += sample_corrected2.size();
@@ -958,15 +993,18 @@ public:
 
         // case C. 1 error in P2, 1 error in P3
 
+        init_sample = get_initial_sample(true);
+
         // forward search P[0...s1]
-        sample = forward_search(pattern, 0, s1, init_sample);
+        sample = forward_only(pattern, 0, s1, init_sample);
+
         if (sample.size() > 0)
         {
             // choose first mismatched position i
             for (ulint i = s1+1; i <= s2-1; ++i)
             {
                 // forward search P[s1+i...i]
-                br_sample sample_error1(forward_search(pattern, s1+1, i-1, sample));
+                br_sample sample_error1(forward_only(pattern, s1+1, i-1, sample));
                 if (sample_error1.is_invalid()) continue;
 
                 // select char from alphabet except P[i]
@@ -975,17 +1013,18 @@ public:
                     if (c1 == remap[pattern[i]]) continue;
 
                     // try to extend rightward with selected char c1
-                    br_sample sample_corrected1(right_extension(remap_inv[c1],sample_error1));
+                    br_sample sample_corrected1(right_only(remap_inv[c1],sample_error1));
                     if (sample_corrected1.is_invalid()) continue;
 
                     // forward search P[i+1...s2-1]
-                    sample_corrected1 = forward_search(pattern, i+1, s2-1, sample_corrected1);
+                    sample_corrected1 = forward_only(pattern, i+1, s2-1, sample_corrected1);
+                    if (sample_corrected1.is_invalid()) continue;
 
                     // choose second mismatched position j
                     for (ulint j = s2; j <= m-1; ++j)
                     {
                         // forward search P[s2...j-1]
-                        br_sample sample_error2(forward_search(pattern, s2, j-1, sample_corrected1));
+                        br_sample sample_error2(forward_only(pattern, s2, j-1, sample_corrected1));
                         if (sample_error2.is_invalid()) continue;
 
                         // select char from alphabet except P[i]
@@ -994,11 +1033,11 @@ public:
                             if (c2 == remap[pattern[j]]) continue;
 
                             // try to extend rightward with selected char c2
-                            br_sample sample_corrected2(right_extension(remap_inv[c2],sample_error2));
+                            br_sample sample_corrected2(right_only(remap_inv[c2],sample_error2));
                             if (sample_corrected2.is_invalid()) continue;
 
                             // forward search P[j+1...m-1]
-                            sample_corrected2 = forward_search(pattern, j+1, m-1, sample_corrected2);
+                            sample_corrected2 = forward_only(pattern, j+1, m-1, sample_corrected2);
                             if (sample_corrected2.is_invalid()) continue;
                             
                             occs += sample_corrected2.size();
@@ -1011,8 +1050,11 @@ public:
 
         // case D. 1 error in P1, 1 error in P3
 
+        init_sample = get_initial_sample();
+
         // forward search P[s1+1...s2-1]
         sample = forward_search(pattern, s1+1, s2-1, init_sample);
+
         if (sample.size() > 0)
         {
             // choose mismatched position i in P3
@@ -1061,7 +1103,6 @@ public:
                             occs += sample_corrected2.size();
                         }
                     }
-
                 }
             }
         } // case D
@@ -1072,14 +1113,14 @@ public:
     /*
      * locate occurrences of a given pattern
      */
-    std::vector<ulint> locate(std::string const& pattern, bool right=true)
+    std::vector<ulint> locate(std::string const& pattern, bool right=false)
     {
         if (right) 
         {
-            br_sample sample(get_initial_sample());
+            br_sample sample(get_initial_sample(true));
             for (size_t i = 0; i < pattern.size(); ++i)
             {
-                sample = right_extension(pattern[i],sample);
+                sample = right_only(pattern[i],sample);
                 if (sample.is_invalid()) return {};
             }
             return locate_sample(sample);
@@ -1089,10 +1130,10 @@ public:
             br_sample sample(get_initial_sample());
             for (size_t i = 0; i < pattern.size(); ++i)
             {
-                sample = left_extension(pattern[pattern.size()-1-i],sample);
+                sample = left_only(pattern[pattern.size()-1-i],sample);
                 if (sample.is_invalid()) return {};
             }
-            return locate_sample(sample);
+            return locate_sample_backward(sample);
         }
     }
 
@@ -1103,7 +1144,7 @@ public:
     {
         ulint m = pattern.size();
         ulint x = (m+1)/2;
-        br_sample init_sample(get_initial_sample());
+        br_sample init_sample;
         br_sample sample;
 
         std::vector<ulint> occs;
@@ -1111,7 +1152,8 @@ public:
         // case A. mismatch occurs in the first half
 
         // first backward search P[x+1...m-1]
-        sample = backward_search(pattern, x+1, m-1, init_sample);
+        init_sample = get_initial_sample();
+        sample = backward_only(pattern, x+1, m-1, init_sample);
 
         if (sample.size() > 0)
         {
@@ -1120,7 +1162,7 @@ public:
             for (ulint i = x + 1; i-- > 0; )
             {
                 // backward search P[i+1...x]
-                br_sample sample_error(backward_search(pattern, i+1, x, sample));
+                br_sample sample_error(backward_only(pattern, i+1, x, sample));
                 if (sample_error.is_invalid()) continue;
 
                 // select character from alphabet except P[i]
@@ -1129,16 +1171,16 @@ public:
                     if (c == remap[pattern[i]]) continue;
 
                     // try to extend with the selected character c
-                    br_sample sample_corrected(left_extension(remap_inv[c],sample_error));
+                    br_sample sample_corrected(left_only(remap_inv[c],sample_error));
                     if (sample_corrected.is_invalid()) continue;
 
                     // backward search remaining interval P[0...i-1]
                     if (i != 0) 
                     {
-                        sample_corrected = backward_search(pattern, 0, i-1, sample_corrected);
+                        sample_corrected = backward_only(pattern, 0, i-1, sample_corrected);
                         if (sample_corrected.is_invalid()) continue;
                     }
-                    auto occs_tmp = locate_sample(sample_corrected);
+                    auto occs_tmp = locate_sample_backward(sample_corrected);
                     occs.insert(occs.end(),occs_tmp.begin(),occs_tmp.end());                    
                 }
             }
@@ -1147,7 +1189,8 @@ public:
         // case B. mismatch occurs in the second half
 
         // first forward search P[0...x]
-        sample = forward_search(pattern, 0, x, init_sample);
+        init_sample = get_initial_sample(true);
+        sample = forward_only(pattern, 0, x, init_sample);
 
         if (sample.size() > 0)
         {
@@ -1155,7 +1198,7 @@ public:
             for (ulint i = x+1; i < m; ++i)
             {
                 // forward search P[x+1,i-1]
-                br_sample sample_error(forward_search(pattern, x+1, i-1, sample));
+                br_sample sample_error(forward_only(pattern, x+1, i-1, sample));
                 if (sample_error.is_invalid()) continue;
 
                 // select character from alphabet except P[i]
@@ -1164,11 +1207,11 @@ public:
                     if (c == remap[pattern[i]]) continue;
 
                     // try to extend with the selected character c
-                    br_sample sample_corrected(right_extension(remap_inv[c],sample_error));
+                    br_sample sample_corrected(right_only(remap_inv[c],sample_error));
                     if (sample_corrected.is_invalid()) continue;
 
                     // forward search remaining interval P[i+1...m-1]
-                    sample_corrected = forward_search(pattern, i+1, m-1, sample_corrected);
+                    sample_corrected = forward_only(pattern, i+1, m-1, sample_corrected);
                     if (sample_corrected.is_invalid()) continue;
 
                     auto occs_tmp = locate_sample(sample_corrected);
@@ -1191,7 +1234,7 @@ public:
         ulint s1 = m/3;
         ulint s2 = m - s1;
 
-        br_sample init_sample(get_initial_sample());
+        br_sample init_sample;
         br_sample sample;
 
         std::vector<ulint> occs;
@@ -1209,15 +1252,18 @@ public:
 
         // case A. 2 errors in P1 & P2
 
+        init_sample = get_initial_sample();
+
         // backward search P[s2...m-1]
-        sample = backward_search(pattern, s2, m-1, init_sample);
+        sample = backward_only(pattern, s2, m-1, init_sample);
+
         if (sample.size() > 0)
         {
             // choose first mismatched position i
             for (ulint i = s2-1; i > 0; --i)
             {
                 // backward search P[i+1...s2-1]
-                br_sample sample_error1(backward_search(pattern, i+1, s2-1, sample));
+                br_sample sample_error1(backward_only(pattern, i+1, s2-1, sample));
                 if (sample_error1.is_invalid()) continue;
 
                 // select char from alphabet except P[i]
@@ -1226,13 +1272,13 @@ public:
                     if (c1 == remap[pattern[i]]) continue;
 
                     // try to extend leftward with selected char c1
-                    br_sample sample_corrected1(left_extension(remap_inv[c1], sample_error1));
+                    br_sample sample_corrected1(left_only(remap_inv[c1], sample_error1));
                     if (sample_corrected1.is_invalid()) continue;
 
                     // choose second mismatched position j
                     for (ulint j = i; j-- > 0; )
                     {
-                        br_sample sample_error2(backward_search(pattern, j+1, i-1, sample_corrected1));
+                        br_sample sample_error2(backward_only(pattern, j+1, i-1, sample_corrected1));
                         if (sample_error2.is_invalid()) continue;
 
                         // select character from alphabet except P[j]
@@ -1241,17 +1287,17 @@ public:
                             if (c2 == remap[pattern[j]]) continue;
 
                             // try to extend leftward with selected char c2
-                            br_sample sample_corrected2(left_extension(remap_inv[c2], sample_error2));
+                            br_sample sample_corrected2(left_only(remap_inv[c2], sample_error2));
                             if (sample_corrected2.is_invalid()) continue;
 
                             if (j != 0)
                             {
                                 // backward search P[0...j-1]
-                                sample_corrected2 = backward_search(pattern, 0, j-1, sample_corrected2);
+                                sample_corrected2 = backward_only(pattern, 0, j-1, sample_corrected2);
                                 if (sample_corrected2.is_invalid()) continue;
                             }
                             
-                            auto occs_tmp = locate_sample(sample_corrected2);
+                            auto occs_tmp = locate_sample_backward(sample_corrected2);
                             occs.insert(occs.end(),occs_tmp.begin(),occs_tmp.end());
                         }
                     }
@@ -1262,15 +1308,18 @@ public:
 
         // case B. 2 errors in P3
 
+        init_sample = get_initial_sample(true);
+
         // forward search P[0...s2-1]
-        sample = forward_search(pattern, 0, s2-1, init_sample);
+        sample = forward_only(pattern, 0, s2-1, init_sample);
+
         if (sample.size() > 0)
         {
             // choose first mismatched position i
             for (ulint i = s2; i <= m-2; ++i)
             {
                 // forward search P[s2...i-1]
-                br_sample sample_error1(forward_search(pattern, s2, i-1, sample));
+                br_sample sample_error1(forward_only(pattern, s2, i-1, sample));
                 if (sample_error1.is_invalid()) continue;
 
                 // select char from alphabet except P[i]
@@ -1279,14 +1328,14 @@ public:
                     if (c1 == remap[pattern[i]]) continue;
 
                     // try to extend rightward with selected char c1
-                    br_sample sample_corrected1(right_extension(remap_inv[c1],sample_error1));
+                    br_sample sample_corrected1(right_only(remap_inv[c1],sample_error1));
                     if (sample_corrected1.is_invalid()) continue;
 
                     // choose second mismatched position j
                     for (ulint j = i+1; j <= m-1; ++j)
                     {
                         // forward search P[i+1...j-1]
-                        br_sample sample_error2(forward_search(pattern, i+1, j-1, sample_corrected1));
+                        br_sample sample_error2(forward_only(pattern, i+1, j-1, sample_corrected1));
                         if (sample_error2.is_invalid()) continue;
 
                         // select char from alphabet except P[i]
@@ -1295,11 +1344,11 @@ public:
                             if (c2 == remap[pattern[j]]) continue;
 
                             // try to extend rightward with selected char c2
-                            br_sample sample_corrected2(right_extension(remap_inv[c2],sample_error2));
+                            br_sample sample_corrected2(right_only(remap_inv[c2],sample_error2));
                             if (sample_corrected2.is_invalid()) continue;
 
                             // forward search P[j+1...m-1]
-                            sample_corrected2 = forward_search(pattern, j+1, m-1, sample_corrected2);
+                            sample_corrected2 = forward_only(pattern, j+1, m-1, sample_corrected2);
                             if (sample_corrected2.is_invalid()) continue;
                             
                             auto occs_tmp = locate_sample(sample_corrected2);
@@ -1313,15 +1362,18 @@ public:
 
         // case C. 1 error in P2, 1 error in P3
 
+        init_sample = get_initial_sample(true);
+
         // forward search P[0...s1]
-        sample = forward_search(pattern, 0, s1, init_sample);
+        sample = forward_only(pattern, 0, s1, init_sample);
+
         if (sample.size() > 0)
         {
             // choose first mismatched position i
             for (ulint i = s1+1; i <= s2-1; ++i)
             {
                 // forward search P[s1+i...i]
-                br_sample sample_error1(forward_search(pattern, s1+1, i-1, sample));
+                br_sample sample_error1(forward_only(pattern, s1+1, i-1, sample));
                 if (sample_error1.is_invalid()) continue;
 
                 // select char from alphabet except P[i]
@@ -1330,17 +1382,17 @@ public:
                     if (c1 == remap[pattern[i]]) continue;
 
                     // try to extend rightward with selected char c1
-                    br_sample sample_corrected1(right_extension(remap_inv[c1],sample_error1));
+                    br_sample sample_corrected1(right_only(remap_inv[c1],sample_error1));
                     if (sample_corrected1.is_invalid()) continue;
 
                     // forward search P[i+1...s2-1]
-                    sample_corrected1 = forward_search(pattern, i+1, s2-1, sample_corrected1);
+                    sample_corrected1 = forward_only(pattern, i+1, s2-1, sample_corrected1);
 
                     // choose second mismatched position j
                     for (ulint j = s2; j <= m-1; ++j)
                     {
                         // forward search P[s2...j-1]
-                        br_sample sample_error2(forward_search(pattern, s2, j-1, sample_corrected1));
+                        br_sample sample_error2(forward_only(pattern, s2, j-1, sample_corrected1));
                         if (sample_error2.is_invalid()) continue;
 
                         // select char from alphabet except P[i]
@@ -1349,11 +1401,11 @@ public:
                             if (c2 == remap[pattern[j]]) continue;
 
                             // try to extend rightward with selected char c2
-                            br_sample sample_corrected2(right_extension(remap_inv[c2],sample_error2));
+                            br_sample sample_corrected2(right_only(remap_inv[c2],sample_error2));
                             if (sample_corrected2.is_invalid()) continue;
 
                             // forward search P[j+1...m-1]
-                            sample_corrected2 = forward_search(pattern, j+1, m-1, sample_corrected2);
+                            sample_corrected2 = forward_only(pattern, j+1, m-1, sample_corrected2);
                             if (sample_corrected2.is_invalid()) continue;
                             
                             auto occs_tmp = locate_sample(sample_corrected2);
@@ -1367,8 +1419,11 @@ public:
 
         // case D. 1 error in P1, 1 error in P3
 
+        init_sample = get_initial_sample();
+
         // forward search P[s1+1...s2-1]
         sample = forward_search(pattern, s1+1, s2-1, init_sample);
+
         if (sample.size() > 0)
         {
             // choose mismatched position i in P3
@@ -1697,6 +1752,136 @@ public:
     }
 
 private:
+
+    /*
+     * only updates range for SA
+     * use when you only search backward
+     * 
+     * assumes sample is SA[r] if range is [l,r]
+     * assumes c is original char (not remapped)
+     */
+    br_sample left_only(uchar c, br_sample const& prev_sample)
+    {
+        // replace c with internal representation
+        c = remap[c];
+
+        br_sample sample(prev_sample);
+
+        // get SA range of cP
+        sample.range = LF(prev_sample.range,c);
+
+        // pattern cP was not found
+        if (sample.is_invalid()) return sample;
+
+        if (bwt[prev_sample.range.second] == c)
+        {
+            sample.d++;
+        } 
+        else 
+        {
+            ulint rnk = bwt.rank(prev_sample.range.second,c);
+            rnk--;
+            ulint k = bwt.select(rnk,c);
+            ulint run_of_k = bwt.run_of_position(k);
+            sample.j = samples_last[run_of_k];
+            sample.d = 0;
+        }
+        sample.len++;
+
+        return sample;
+    }
+
+    /*
+     * only updates range for SAR
+     * use when you only search forward
+     * 
+     * assumes sample is SAR[e] if range is [s,e]
+     * assumes c is original char (not remapped)
+     */
+    br_sample right_only(uchar c, br_sample const& prev_sample)
+    {
+        // replace c with internal representation
+        c = remap[c];
+
+        br_sample sample(prev_sample);
+
+        // get SAR range of Pc
+        sample.rangeR = LFR(prev_sample.rangeR,c);
+
+        // pattern Pc was not found
+        if (sample.is_invalid()) return sample;
+
+        if (bwtR[prev_sample.rangeR.second] != c)
+        {
+            ulint rnk = bwtR.rank(prev_sample.rangeR.second,c);
+            rnk--;
+            ulint k = bwtR.select(rnk,c);
+            ulint run_of_k = bwtR.run_of_position(k);
+            sample.j = bwt.size()-2-samples_lastR[run_of_k];
+            sample.d = sample.len;
+        }
+        sample.len++;
+        return sample;
+    }
+
+    /*
+     * backward search P[left...right]
+     * range for SAR is not updated
+     */
+    br_sample backward_only(std::string const& pattern, ulint left, ulint right, br_sample const& sample)
+    {
+        br_sample res(sample);
+        for (ulint i = right + 1; i-- > left; )
+        {
+            res = left_only(pattern[i],res);
+            if (res.is_invalid()) return res;
+        }
+        return res;
+    }
+
+    /*
+     * forward search P[left...right]
+     * range for SA is not updated
+     */
+    br_sample forward_only(std::string const& pattern, ulint left, ulint right, br_sample const& sample)
+    {
+        br_sample res(sample);
+        for (ulint i = left; i <= right; ++i)
+        {
+            res = right_only(pattern[i],res);
+            if (res.is_invalid()) return res;
+        }
+        return res;
+    }
+
+    /*
+     * locate occurrences of current pattern P 
+     * use while backward searching only (since it assumes sample is SA[r] when SA range is [l,r])
+     * 
+     * return them as std::vector
+     * (space consuming if result is big)
+     */
+    std::vector<ulint> locate_sample_backward(br_sample const& sample)
+    {
+        ulint sa = sample.j - sample.d;
+        ulint n_occ = sample.range.second + 1 - sample.range.first;
+
+        std::vector<ulint> res(n_occ);
+        if (n_occ > 0)
+        {
+            res[0] = sa;
+            for (ulint i = 1; i < n_occ; ++i)
+            {
+                sa = Phi(sa);
+                res[i] = sa;
+            }
+        }
+        return res;
+    }
+
+    /*
+     * builds BWT
+     */
     std::tuple<std::string, std::vector<range_t>, std::vector<range_t> > 
     sufsort(sdsl::int_vector<8>& text, sdsl::int_vector_buffer<>& sa)
     {
