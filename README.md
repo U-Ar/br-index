@@ -2,7 +2,7 @@
 
 ## About
 
-This repository implements the __bi-directional__ r-index (_br-index_).
+This repository provides the __bi-directional__ r-index (_br-index_).
 
 The r-index is a compressed text index which supports count(P) and locate(P).
 Its size is O(r) words, whose r is the number of equal-letter runs in BWT of the text.
