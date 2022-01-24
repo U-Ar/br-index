@@ -2,10 +2,10 @@
 
 ## About
 
-This repository implements the __bi-directional__ r-index (_br-index_).
+This repository provides the __bi-directional__ r-index (_br-index_).
 
-The r-index is a compressed text index which supports count(P) and locate(P).
-Its size is O(r) words, whose r is the number of equal-letter runs in BWT of the text.
+The r-index is the compressed text index which supports efficient count(P) and locate(P).
+Its uses O(r) words of space, whose r is the number of equal-letter runs in BWT of the text.
 
 The r-index was originally proposed in the following papers:
 - Gagie, T., Navarro, G., & Prezza, N. (2018). Optimal-time text indexing in BWT-runs bounded space. In Proceedings of the Twenty-Ninth Annual ACM-SIAM Symposium on Discrete Algorithms (pp. 1459-1477). Society for Industrial and Applied Mathematics.
