@@ -51,8 +51,8 @@ void parse_args(char** argv, int argc, int &ptr){
         char* e;
         allowed = strtol(argv[ptr],&e,10);
 
-        if(*e != '\0' || allowed < 0 || allowed > 2){
-            cout << "Error: invalid value not 0, 1, 2 after -m option." << endl;
+        if(*e != '\0' || allowed < 0){
+            cout << "Error: invalid negative value after -m option." << endl;
             help();
         }
 
@@ -74,6 +74,7 @@ void locate_all(ifstream& in, string patterns)
     using std::chrono::duration_cast;
     using std::chrono::duration;
     using std::chrono::milliseconds;
+    using std::chrono::microseconds;
 
     string text;
     bool c = false;
@@ -110,8 +111,14 @@ void locate_all(ifstream& in, string patterns)
 
     ulint last_perc = 0;
 
-    ulint occ0 = 0, occ1 = 0, occ2 = 0;
     ulint occ_tot = 0;
+
+    auto t3 = high_resolution_clock::now();
+    auto t4 = high_resolution_clock::now();
+    auto t5 = high_resolution_clock::now();
+    ulint count_time = 0;
+    ulint locate_time = 0;
+    ulint tot_time = 0;
 
     // extract patterns from file and search them in the index
     for (ulint i = 0; i < n; ++i)
@@ -132,35 +139,21 @@ void locate_all(ifstream& in, string patterns)
             p += c;
         }
 
-        // exact match
-        vector<ulint> occs = idx.locate(p);
-        occ0 += occs.size();
+        t3 = high_resolution_clock::now();
+        auto samples = idx.search_with_mismatch(p,allowed);
+        t4 = high_resolution_clock::now();
+        auto occs = idx.locate_samples(samples);
+        t5 = high_resolution_clock::now();
+
+        count_time += duration_cast<microseconds>(t4-t3).count();
+        locate_time += duration_cast<microseconds>(t5-t4).count();
         occ_tot += occs.size();
+        tot_time += duration_cast<microseconds>(t4-t3).count() + duration_cast<microseconds>(t5-t4).count();
+
 
         if (c) // check occurrences
         {
-            cout << "number of exact occs             : " << occs.size() << endl;
-            for (auto o : occs)
-            {
-                if (text.substr(o,p.size()).compare(p) != 0) 
-                {
-                    cout << "Error: wrong occurrence:  " << o << endl;
-                    cout << "       original pattern:  " << p << endl;
-                    cout << "       wrong    pattern: "  << text.substr(o,p.size()) << endl;
-                }
-            }
-        }
-
-        if (allowed < 1) continue;
-
-        // approximate match with 1 miss
-        occs = idx.locate1(p);
-        occ1 += occs.size();
-        occ_tot += occs.size();
-
-        if (c) // check occurrences
-        {
-            cout << "number of occs with 1 mismatch   : " << occs.size() << endl;
+            cout << "number of occs with at most " << allowed << " mismatch   : " << occs.size() << endl;
             for (auto o : occs)
             {
                 int mismatches = 0;
@@ -168,33 +161,7 @@ void locate_all(ifstream& in, string patterns)
                 {
                     if (text[o+i] != p[i]) mismatches++;
                 }
-                if (mismatches != 1) 
-                {
-                    cout << "Error: wrong occurrence:  " << o << endl;
-                    cout << "       original pattern:  " << p << endl;
-                    cout << "       wrong    pattern: " << text.substr(o,p.size()) << endl;
-                }
-            }
-        }
-
-        if (allowed < 2) continue;
-
-        // approximate match with 2 miss
-        occs = idx.locate2(p);
-        occ2 += occs.size();
-        occ_tot += occs.size();
-
-        if (c) // check occurrences
-        {
-            cout << "number of occs with 2 mismatches : " << occs.size() << endl;
-            for (auto o : occs)
-            {
-                int mismatches = 0;
-                for (size_t i = 0; i < p.size(); ++i)
-                {
-                    if (text[o+i] != p[i]) mismatches++;
-                }
-                if (mismatches != 2) 
+                if (mismatches > allowed) 
                 {
                     cout << "Error: wrong occurrence:  " << o << endl;
                     cout << "       original pattern:  " << p << endl;
@@ -202,6 +169,8 @@ void locate_all(ifstream& in, string patterns)
                 }
             }
         }
+
+        
     }
 
     double occ_avg = (double)occ_tot / n;
@@ -210,28 +179,18 @@ void locate_all(ifstream& in, string patterns)
 
     ifs.close();
 
-    auto t3 = high_resolution_clock::now();
-
     ulint load = duration_cast<milliseconds>(t2-t1).count();
     cout << "Load time  : " << load << " milliseconds" << endl;
 
-    ulint search = duration_cast<milliseconds>(t3-t2).count();
     cout << "Number of patterns n = " << n << endl;
 	cout << "Pattern length     m = " << m << endl;
-    cout << "Occurrences with 0 mismatch   occ0 = " << occ0 << endl;
-    if (allowed >= 1)
-    {
-        cout << "Occurrences with 1 mismatch   occ1 = " << occ1 << endl;
-        if (allowed >= 2)
-        {
-            cout << "Occurrences with 2 mismatches occ2 = " << occ2 << endl;
-        }
-    }
 	cout << "Total number of occurrences   occt = " << occ_tot << endl << endl;
 
-    cout << "Total time : " << search << " milliseconds" << endl;
-	cout << "Search time: " << (double)search/n << " milliseconds/pattern (total: " << n << " patterns)" << endl;
-	cout << "Search time: " << (double)search/occ_tot << " milliseconds/occurrence (total: " << occ_tot << " occurrences)" << endl;
+    cout << "LF-mapping time: " << count_time << " microseconds" << endl;
+    cout << "Phi        time: " << locate_time << " microseconds" << endl;
+    cout << "Total time : " << tot_time << " microseconds" << endl;
+	cout << "Search time: " << (double)tot_time/n << " microseconds/pattern (total: " << n << " patterns)" << endl;
+	cout << "Search time: " << (double)tot_time/occ_tot << " microseconds/occurrence (total: " << occ_tot << " occurrences)" << endl;
 }
 
 

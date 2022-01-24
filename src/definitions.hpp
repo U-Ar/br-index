@@ -9,6 +9,7 @@
 #include <sstream>
 #include <string>
 #include <tuple>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 #include <sdsl/construct.hpp>
@@ -27,6 +28,24 @@ typedef uint32_t uint;
 typedef unsigned char uchar;
 
 typedef std::pair<ulint, ulint> range_t;
+
+struct range_hash
+{
+    /*std::size_t operator() (range_t const& range) const
+    {
+        return std::hash<ulint>()(range.first) ^ std::hash<ulint>()(range.second);
+    }*/
+    std::size_t operator() (range_t const& range) const
+    {
+        auto hash1 = std::hash<ulint>()(range.first);
+        auto hash2 = std::hash<ulint>()(range.second);
+        std::size_t seed = 0;
+        seed ^= hash1 + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        seed ^= hash2 + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        return seed;
+    }
+
+};
 
 };
 

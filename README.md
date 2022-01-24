@@ -59,7 +59,7 @@ make test-bri
 	<dt>br_index_naive.hpp</dt>
 	<dd>The naive implementation of br-index. All the variables <i>p,j,d,pR,jR,dR,len</i> are maintained during the search. Not space-efficient, implemented mainly for the educational purpose and the possible future use.</dd>
 	<dt>br_index.hpp (default)</dt>
-	<dd>The simplified implementation of br-index. Only the variables necessary for locate <i>(j,d,len)</i> are maintained, which are sufficient to compute <i>locate.</i></dd>
+	<dd>The optimized implementation of br-index. Only the variables necessary for locate <i>(j,d,len)</i> are maintained, which are sufficient to compute <i>locate.</i></dd>
 </dl>
 
 ## Notes

@@ -745,6 +745,28 @@ public:
         return res;
     }
 
+    std::vector<ulint> locate_samples(std::vector<br_sample> const& samples)
+    {
+        std::vector<ulint> res;
+		for (auto s: samples)
+		{
+			auto tmp = locate_sample(s);
+			res.insert(res.end(),tmp.begin(),tmp.end());
+		}
+		return res;
+    }
+
+    std::vector<ulint> locate_samples(std::unordered_map<range_t,br_sample,range_hash> const& samples)
+    {
+        std::vector<ulint> res;
+		for (auto it = samples.begin(); it != samples.end(); ++it)
+		{
+			auto tmp = locate_sample(it->second);
+			res.insert(res.end(),tmp.begin(),tmp.end());
+		}
+		return res;
+    }
+
     /*
      * count the number of a given pattern
      */
@@ -1108,6 +1130,263 @@ public:
         } // case D
 
         return occs;
+    }
+
+    std::unordered_map<range_t,br_sample,range_hash> search_with_mismatch(std::string const& pattern, ulint allowed_mis=0)
+    {
+        std::unordered_map<range_t,br_sample,range_hash> res;
+        ulint m = pattern.size();
+        br_sample init_sample(get_initial_sample());
+
+        if (allowed_mis == 0)
+        {
+            br_sample sample(backward_only(pattern,0,m-1,init_sample));
+            if (sample.is_invalid()) return res;
+            res[sample.range] = sample;
+            return res;
+        }
+
+        ulint div = allowed_mis + 1;
+        // divide pattern into div parts and search each part in advance
+        for (ulint part = 0; part < div; ++part)
+        {
+            br_sample sample(forward_search(pattern,(part*m)/div,((part+1)*m)/div-1,init_sample));
+            if (sample.is_invalid()) continue;
+            if (part==0) 
+            {
+                forward_dfs(res,pattern,m,allowed_mis,0,((part+1)*m)/div,0,sample);
+            }
+            else 
+            {
+                backward_dfs(res,pattern,m,allowed_mis,(part*m)/div-1,((part+1)*m)/div-1,0,sample);
+            }
+        }
+
+        return res;
+    }
+
+    void backward_dfs(std::unordered_map<range_t,br_sample,range_hash>& res, std::string const& pattern,
+                    ulint m, ulint allowed_mis, ulint left_pos, ulint right_pos, ulint mis, br_sample prev_sample)
+    {
+        uchar c = remap[pattern[left_pos]];
+
+        ulint acc = 0;
+
+        //std::cout << mis << " " << allowed_mis << "  ";
+
+        if (mis == allowed_mis)
+        {
+            br_sample sample(prev_sample);
+
+            sample.range = LF(prev_sample.range,c);
+            if (sample.is_invalid()) return;
+
+            if (sample.range.second - sample.range.first == 
+                prev_sample.range.second - prev_sample.range.first)
+            {
+                sample.d++;
+            } 
+            else 
+            {
+                for (ulint a = 1; a < c; ++a)
+                {
+                    range_t smaller_range = LF(prev_sample.range,a);
+                    acc += smaller_range.second + 1 - smaller_range.first;
+                }
+
+                sample.rangeR.first = sample.rangeR.first + acc;
+                sample.rangeR.second = sample.rangeR.first + sample.range.second - sample.range.first;
+                ulint rnk = bwt.rank(prev_sample.range.second+1,c);
+                ulint p = bwt.select(rnk-1,c);
+                ulint run_of_p = bwt.run_of_position(p);
+                if (bwt[prev_sample.range.second] == c)
+                    sample.j = samples_first[run_of_p];
+                else
+                    sample.j = samples_last[run_of_p];
+                sample.d = 0;
+            }
+            sample.len++;
+
+            if (left_pos == 0 && right_pos >= m - 1)
+            {
+                res[sample.range] = sample;
+            }
+            else if (left_pos > 0)
+            {
+                backward_dfs(res,pattern,m,allowed_mis,left_pos-1,right_pos,mis,sample);
+            }
+            else
+            {
+                forward_dfs(res,pattern,m,allowed_mis,0,right_pos+1,mis,sample);
+            }
+            
+        } 
+        else // mis < allowed_mis 
+        {
+        
+            for (ulint a = 1; a < sigma+1; ++a)
+            {
+                br_sample sample(prev_sample);
+
+                sample.range = LF(prev_sample.range,a);
+                if (sample.is_invalid()) continue;
+
+                
+                if (sample.range.second - sample.range.first == 
+                    prev_sample.range.second - prev_sample.range.first)
+                {
+                    sample.d++;
+                }
+                else // sample.size() != prev_sample.size()
+                {
+                    sample.rangeR.first = sample.rangeR.first + acc;
+                    sample.rangeR.second = sample.rangeR.first + sample.range.second - sample.range.first;
+                    ulint rnk = bwt.rank(prev_sample.range.second+1,a);
+                    ulint p = bwt.select(rnk-1,a);
+                    ulint run_of_p = bwt.run_of_position(p);
+                    if (bwt[prev_sample.range.second] == a)
+                        sample.j = samples_first[run_of_p];
+                    else
+                        sample.j = samples_last[run_of_p];
+                    sample.d = 0;
+                }
+                sample.len++;
+                acc += sample.range.second + 1 - sample.range.first;
+
+                if (c == a)
+                {
+                    if (left_pos == 0 && right_pos >= m - 1)
+                    {
+                        res[sample.range] = sample;
+                    }
+                    else if (left_pos > 0)
+                    {
+                        backward_dfs(res,pattern,m,allowed_mis,left_pos-1,right_pos,mis,sample);
+                    }
+                    else
+                    {
+                        forward_dfs(res,pattern,m,allowed_mis,0,right_pos+1,mis,sample);
+                    }
+                }
+                else // c != a
+                {
+                    if (left_pos == 0 && right_pos >= m - 1)
+                    {
+                        res[sample.range] = sample;
+                    }
+                    else if (left_pos > 0)
+                    {
+                        backward_dfs(res,pattern,m,allowed_mis,left_pos-1,right_pos,mis+1,sample);
+                    }
+                    else
+                    {
+                        forward_dfs(res,pattern,m,allowed_mis,0,right_pos+1,mis+1,sample);
+                    }
+                }
+            }
+        }   
+    }
+
+    void forward_dfs(std::unordered_map<range_t,br_sample,range_hash>& res, std::string const& pattern,
+                    ulint m, ulint allowed_mis, ulint left_pos, ulint right_pos, ulint mis, br_sample prev_sample)
+    {
+        uchar c = remap[pattern[right_pos]];
+
+        ulint acc = 0;
+
+        //std::cout << mis << " " << allowed_mis << "  ";
+
+        if (mis == allowed_mis)
+        {
+            br_sample sample(prev_sample);
+
+            sample.rangeR = LFR(prev_sample.rangeR,c);
+            if (sample.is_invalid()) return;
+
+
+            if (sample.rangeR.second - sample.rangeR.first != 
+                prev_sample.rangeR.second - prev_sample.rangeR.first)
+            {
+                for (ulint a = 1; a < c; ++a)
+                {
+                    range_t smaller_rangeR = LFR(prev_sample.rangeR,(uchar)a);
+                    acc += (smaller_rangeR.second + 1) - smaller_rangeR.first;
+                }
+
+                sample.range.first = sample.range.first + acc;
+                sample.range.second = sample.range.first + sample.rangeR.second - sample.rangeR.first;
+                ulint rnk = bwtR.rank(prev_sample.rangeR.second+1,c);
+                ulint p = bwtR.select(rnk-1,c);
+                ulint run_of_p = bwtR.run_of_position(p);
+                if (bwtR[prev_sample.rangeR.second] == c)
+                    sample.j = bwt.size()-2-samples_firstR[run_of_p];
+                else
+                    sample.j = bwt.size()-2-samples_lastR[run_of_p];
+                sample.d = sample.len;
+            }
+            sample.len++;
+
+            if (right_pos >= m - 1)
+            {
+                res[sample.range] = sample;
+            }
+            else
+            {
+                forward_dfs(res,pattern,m,allowed_mis,left_pos,right_pos+1,mis,sample);
+            }
+        } 
+        else // mis < allowed_mis 
+        {
+        
+            for (ulint a = 1; a < sigma+1; ++a)
+            {
+                br_sample sample(prev_sample);
+
+                sample.rangeR = LFR(prev_sample.rangeR,(uchar)a);
+                if (sample.is_invalid()) continue;
+
+                
+                if (sample.rangeR.second - sample.rangeR.first != 
+                    prev_sample.rangeR.second - prev_sample.rangeR.first)
+                {
+                    sample.range.first = sample.range.first + acc;
+                    sample.range.second = sample.range.first + sample.rangeR.second - sample.rangeR.first;
+                    ulint rnk = bwtR.rank(prev_sample.rangeR.second+1,a);
+                    ulint p = bwtR.select(rnk-1,a);
+                    ulint run_of_p = bwtR.run_of_position(p);
+                    if (bwtR[prev_sample.rangeR.second] == a)
+                        sample.j = bwt.size()-2-samples_firstR[run_of_p];
+                    else
+                        sample.j = bwt.size()-2-samples_lastR[run_of_p];
+                    sample.d = sample.len;
+                }
+                sample.len++;
+                acc += sample.range.second + 1 - sample.range.first;
+
+                if (c == a)
+                {
+                    if (right_pos >= m - 1)
+                    {
+                        res[sample.range] = sample;
+                    }
+                    else
+                    {
+                        forward_dfs(res,pattern,m,allowed_mis,left_pos,right_pos+1,mis,sample);
+                    }
+                }
+                else // c != a
+                {
+                    if (right_pos >= m - 1)
+                    {
+                        res[sample.range] = sample;
+                    }
+                    else
+                    {
+                        forward_dfs(res,pattern,m,allowed_mis,left_pos,right_pos+1,mis+1,sample);
+                    }
+                }
+            }
+        }
     }
 
     /*
