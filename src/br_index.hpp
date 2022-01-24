@@ -1231,6 +1231,11 @@ public:
                 sample.range = LF(prev_sample.range,a);
                 if (sample.is_invalid()) continue;
 
+                if (a == 1)
+                {
+                    acc++;
+                    continue;
+                }
                 
                 if (sample.range.second - sample.range.first == 
                     prev_sample.range.second - prev_sample.range.first)
@@ -1345,6 +1350,11 @@ public:
                 sample.rangeR = LFR(prev_sample.rangeR,(uchar)a);
                 if (sample.is_invalid()) continue;
 
+                if (a == 1)
+                {
+                    acc++;
+                    continue;
+                }
                 
                 if (sample.rangeR.second - sample.rangeR.first != 
                     prev_sample.rangeR.second - prev_sample.rangeR.first)
