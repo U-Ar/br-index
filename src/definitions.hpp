@@ -31,10 +31,6 @@ typedef std::pair<ulint, ulint> range_t;
 
 struct range_hash
 {
-    /*std::size_t operator() (range_t const& range) const
-    {
-        return std::hash<ulint>()(range.first) ^ std::hash<ulint>()(range.second);
-    }*/
     std::size_t operator() (range_t const& range) const
     {
         auto hash1 = std::hash<ulint>()(range.first);
