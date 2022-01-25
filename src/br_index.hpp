@@ -1150,7 +1150,7 @@ public:
         // divide pattern into div parts and search each part in advance
         for (ulint part = 0; part < div; ++part)
         {
-            br_sample sample(forward_search(pattern,(part*m)/div,((part+1)*m)/div-1,init_sample));
+            br_sample sample(backward_search(pattern,(part*m)/div,((part+1)*m)/div-1,init_sample));
             if (sample.is_invalid()) continue;
             if (part==0) 
             {
@@ -1170,12 +1170,12 @@ public:
     {
         uchar c = remap[pattern[left_pos]];
 
-        ulint acc = 0;
-
         //std::cout << mis << " " << allowed_mis << "  ";
 
         if (mis == allowed_mis)
         {
+            ulint acc = 0;
+
             br_sample sample(prev_sample);
 
             sample.range = LF(prev_sample.range,c);
@@ -1190,7 +1190,7 @@ public:
             {
                 for (ulint a = 1; a < c; ++a)
                 {
-                    range_t smaller_range = LF(prev_sample.range,a);
+                    range_t smaller_range = LF(prev_sample.range,(uchar)a);
                     acc += smaller_range.second + 1 - smaller_range.first;
                 }
 
@@ -1223,12 +1223,13 @@ public:
         } 
         else // mis < allowed_mis 
         {
+            ulint acc = 0;
         
             for (ulint a = 1; a < sigma+1; ++a)
             {
                 br_sample sample(prev_sample);
 
-                sample.range = LF(prev_sample.range,a);
+                sample.range = LF(prev_sample.range,(uchar)a);
                 if (sample.is_invalid()) continue;
 
                 if (a == 1)
@@ -1297,12 +1298,10 @@ public:
     {
         uchar c = remap[pattern[right_pos]];
 
-        ulint acc = 0;
-
-        //std::cout << mis << " " << allowed_mis << "  ";
-
         if (mis == allowed_mis)
         {
+            ulint acc = 0;
+
             br_sample sample(prev_sample);
 
             sample.rangeR = LFR(prev_sample.rangeR,c);
@@ -1342,6 +1341,7 @@ public:
         } 
         else // mis < allowed_mis 
         {
+            ulint acc = 0;
         
             for (ulint a = 1; a < sigma+1; ++a)
             {
