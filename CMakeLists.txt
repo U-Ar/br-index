@@ -24,6 +24,26 @@ TARGET_LINK_LIBRARIES(bri-build sdsl)
 TARGET_LINK_LIBRARIES(bri-build divsufsort)
 TARGET_LINK_LIBRARIES(bri-build divsufsort64)
 
+ADD_EXECUTABLE(brif-build src/brif-build.cpp)
+TARGET_LINK_LIBRARIES(brif-build sdsl)
+TARGET_LINK_LIBRARIES(brif-build divsufsort)
+TARGET_LINK_LIBRARIES(brif-build divsufsort64)
+
+ADD_EXECUTABLE(brif-locate src/brif-locate.cpp)
+TARGET_LINK_LIBRARIES(brif-locate sdsl)
+TARGET_LINK_LIBRARIES(brif-locate divsufsort)
+TARGET_LINK_LIBRARIES(brif-locate divsufsort64)
+
+ADD_EXECUTABLE(bri-seed src/bri-seed.cpp)
+TARGET_LINK_LIBRARIES(bri-seed sdsl)
+TARGET_LINK_LIBRARIES(bri-seed divsufsort)
+TARGET_LINK_LIBRARIES(bri-seed divsufsort64)
+
+ADD_EXECUTABLE(brif-seed src/brif-seed.cpp)
+TARGET_LINK_LIBRARIES(brif-seed sdsl)
+TARGET_LINK_LIBRARIES(brif-seed divsufsort)
+TARGET_LINK_LIBRARIES(brif-seed divsufsort64)
+
 ADD_EXECUTABLE(bri-count src/bri-count.cpp)
 TARGET_LINK_LIBRARIES(bri-count sdsl)
 TARGET_LINK_LIBRARIES(bri-count divsufsort)

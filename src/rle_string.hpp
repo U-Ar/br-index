@@ -252,6 +252,45 @@ public:
 
     }
 
+    ulint run_start(ulint j)
+    {
+        assert(j < run_heads.size());
+
+        ulint this_block = j/B;
+        ulint current_run = this_block * B;
+        ulint pos = (this_block == 0 ? 0 : runs.select(this_block-1)+1);
+
+        while (current_run < j)
+        {
+            pos += run_at(current_run);
+            current_run++;
+        }
+
+        assert(current_run == j);
+
+        return pos;
+    }
+
+    ulint run_end(ulint j)
+    {
+        assert(j < run_heads.size());
+
+        ulint this_block = j/B;
+        ulint current_run = this_block * B;
+        ulint pos = (this_block == 0 ? 0 : runs.select(this_block-1)+1);
+
+        while (current_run < j)
+        {
+            pos += run_at(current_run);
+            current_run++;
+        }
+
+        assert(current_run == j);
+
+        return pos + run_at(j) - 1;
+    }
+
+
     /*
      * length of i-th run
      */
