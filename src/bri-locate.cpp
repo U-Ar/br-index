@@ -143,14 +143,6 @@ void locate_all(ifstream& in, string patterns)
         auto samples = idx.search_with_mismatch(p,allowed);
         t4 = high_resolution_clock::now();
         auto occs = idx.locate_samples(samples);
-        //ulint tmp = 0;
-        //for (auto s: samples) tmp += s.second.size();
-        //cout << "occ num: "<< tmp << endl;
-        //auto occs = idx.locate(p);
-        //auto occs1 = idx.locate1(p);
-        //auto occs2 = idx.locate2(p);
-        //occs.insert(occs.end(),occs1.begin(),occs1.end());
-        //occs.insert(occs.end(),occs2.begin(),occs2.end());
         t5 = high_resolution_clock::now();
 
         count_time += duration_cast<microseconds>(t4-t3).count();
@@ -162,11 +154,6 @@ void locate_all(ifstream& in, string patterns)
         if (c) // check occurrences
         {
             cout << "number of occs with at most " << allowed << " mismatch   : " << occs.size() << endl;
-            //cout << "the original pattern: " << p << endl;
-            for (auto s : samples)
-            {
-                cout << s.second.range.first << " " << s.second.range.second << " " << s.second.j << " " << s.second.len << endl;
-            }
             for (auto o : occs)
             {
                 int mismatches = 0;
@@ -195,15 +182,15 @@ void locate_all(ifstream& in, string patterns)
     ulint load = duration_cast<milliseconds>(t2-t1).count();
     cout << "Load time  : " << load << " milliseconds" << endl;
 
-    cout << "Number of patterns n = " << n << endl;
-	cout << "Pattern length     m = " << m << endl;
-	cout << "Total number of occurrences   occt = " << occ_tot << endl << endl;
+    cout << "Number of patterns             n = " << n << endl;
+	cout << "Pattern length                 m = " << m << endl;
+	cout << "Total number of occurrences  occ = " << occ_tot << endl << endl;
 
     cout << "LF-mapping time: " << count_time << " microseconds" << endl;
     cout << "Phi        time: " << locate_time << " microseconds" << endl;
-    cout << "Total time : " << tot_time << " microseconds" << endl;
-	cout << "Search time: " << (double)tot_time/n << " microseconds/pattern (total: " << n << " patterns)" << endl;
-	cout << "Search time: " << (double)tot_time/occ_tot << " microseconds/occurrence (total: " << occ_tot << " occurrences)" << endl;
+    cout << "Total time     : " << tot_time << " microseconds" << endl;
+	cout << "Search time    : " << (double)tot_time/n << " microseconds/pattern (total: " << n << " patterns)" << endl;
+	cout << "Search time    : " << (double)tot_time/occ_tot << " microseconds/occurrence (total: " << occ_tot << " occurrences)" << endl;
 }
 
 
