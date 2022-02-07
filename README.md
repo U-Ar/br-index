@@ -33,15 +33,17 @@ cd build
 cmake ..
 make
 ```
-5 executables will be created in the _build_ directory.
+6 executables will be created in the _build_ directory.
 <dl>
 	<dt>bri-build</dt>
 	<dd>Builds the br-index on the input text file.</dd>
 	<dt>bri-locate</dt>
 	<dd>Locates the occurrences of the given pattern using the index. Provide a pattern file in 
-	the <a href="https://pizzachili.dcc.uchile.cl/experiments.html">Pizza&Chili format</a>. You can give an option "-m (number)" for the number of mismatched characters allowed (0,1,2 are supported, 0 by default).</dd>
+	the <a href="https://pizzachili.dcc.uchile.cl/experiments.html">Pizza&Chili format</a>. You can give an option "-m (number)" for the number of mismatched characters allowed (0 by default).</dd>
 	<dt>bri-count</dt>
 	<dd>Counts the number of the occurrences of the given pattern using the index. Its usage is same as bri-locate.</dd>
+	<dt>bri-seedex</dt>
+	<dd>Applies the seed-and-extend approach to the given pattern. Exactly matches the core region and extends with some mismatches.</dd>
 	<dt>bri-space</dt>
 	<dd>Shows the statistics of the text and the breakdown of the index space usage.</dd>
 	<dt>run_tests</dt>
@@ -56,11 +58,11 @@ make test-bri
 ## Versions
 
 <dl>
-	<dt>br_index_naive.hpp</dt>
-	<dd>The naive implementation of br-index. All the variables <i>p,j,d,pR,jR,dR,len</i> are maintained during the search. Not space-efficient, implemented mainly for the educational purpose and the possible future use.</dd>
 	<dt>br_index.hpp (default)</dt>
-	<dd>The optimized implementation of br-index. Only the variables necessary for locate <i>(j,d,len)</i> are maintained, which are sufficient to compute <i>locate.</i></dd>
+	<dd>The simple implementation of br-index. Only the variables necessary for locate <i>(j,d,len)</i> are maintained, which are sufficient to compute <i>locate.</i></dd>
+	<dt>br_index_nplcp.hpp</dt>
+	<dd>The implementation without PLCP. <i>(p,j,d,len)</i> are maintained. It computes <i>locate</i> by calculating <i>p'=LF^d(p)</i> and comparing <i>p'</i> with
+	[<i>s, e</i>]. Larger than the normal one while computing <i>locate</i> is faster when occ is large compared to |P|.
+	<dt>br_index_naive.hpp (old)</dt>
+	<dd>The naive implementation of br-index. All the variables <i>p,j,d,pR,jR,dR,len</i> are maintained during the search. Not space-efficient, implemented mainly for the educational purpose and the possible future use. (It's not updated now, so it doesn't function)</dd>
 </dl>
-
-## Notes
-- count and locate can be carried out by just the r-index. The br-index shows the better performance when the allowed number of mismatches is big. Now implemented up to 2 as a reference, but 3 or more can be implemented in similar ways. 
