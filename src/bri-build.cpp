@@ -15,7 +15,7 @@ bool sais = true;
 bool nplcp = false;
 
 void help(){
-	cout << "bri-build: builds the bidirectional r-index. Extension .ri is automatically added to output index file" << endl << endl;
+	cout << "bri-build: builds the bidirectional r-index. Extension .bri/.brin is automatically added to output index file" << endl << endl;
 	cout << "Usage: bri-build [options] <input_file_name>" << endl;
 	cout << "   -o <basename>        use 'basename' as prefix for all index files. Default: basename is the specified input_file_name"<<endl;
 	cout << "   -divsufsort          use divsufsort algorithm to build the BWT (fast, 7.5n Bytes of RAM). By default,"<<endl;
