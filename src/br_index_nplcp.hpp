@@ -1,10 +1,10 @@
 /*
  * bi-directional r-index 
- *  the simpler implementation
+ *  the implementation without PLCP
  */
 
-#ifndef INCLUDED_BR_INDEX_FAST_HPP
-#define INCLUDED_BR_INDEX_FAST_HPP
+#ifndef INCLUDED_BR_INDEX_NPLCP_HPP
+#define INCLUDED_BR_INDEX_NPLCP_HPP
 
 #include "definitions.hpp"
 #include "rle_string.hpp"
@@ -14,7 +14,7 @@
 namespace bri {
 
 // sample maintained during the search
-struct br_sample {
+struct br_sample_nplcp {
     /*
      * state variables for left_extension & right_extension
      * range: SA range of P
@@ -26,9 +26,9 @@ struct br_sample {
     range_t range, rangeR;
     ulint p, j, d, len;
     
-    br_sample(): range(), rangeR() {}
+    br_sample_nplcp(): range(), rangeR() {}
 
-    br_sample(range_t range_, 
+    br_sample_nplcp(range_t range_, 
               range_t rangeR_,
               ulint p_,
               ulint j_,
@@ -74,13 +74,13 @@ template<
     class sparse_bitvector_t = sparse_sd_vector,
     class rle_string_t = rle_string_sd 
 >
-class br_index_fast {
+class br_index_nplcp {
 
 public:
 
     using triple = std::tuple<range_t, ulint, ulint>;
 
-    br_index_fast() {}
+    br_index_nplcp() {}
 
     /*
      * constructor. 
@@ -88,7 +88,7 @@ public:
      * \param sais: flag determining if we use SAIS for suffix sort. 
      *              otherwise we use divsufsort
      */
-    br_index_fast(std::string const& input, bool sais = true)
+    br_index_nplcp(std::string const& input, bool sais = true)
     {
         
         this->sais = sais;
@@ -562,10 +562,10 @@ public:
     /*
      * get a sample corresponding to an empty string
      */
-    br_sample get_initial_sample(bool right=true)
+    br_sample_nplcp get_initial_sample(bool right=true)
     {
         if (!right) {
-            return br_sample(full_range(), // entire SA range
+            return br_sample_nplcp(full_range(), // entire SA range
                             full_range(), // entire SAR range
                             0,
                             (samples_last[r-1]+1) % bwt.size(), // arbitrary sample
@@ -574,7 +574,7 @@ public:
         }
         else 
         {
-            return br_sample(full_range(), // entire SA range
+            return br_sample_nplcp(full_range(), // entire SA range
                             full_range(), // entire SAR range
                             0,
                             (samples_lastR[rR-1]+1) % bwtR.size(), // arbitrary sample
@@ -591,12 +591,12 @@ public:
      * 
      * assumes c is original char (not remapped)
      */
-    br_sample left_extension(uchar c, br_sample const& prev_sample)
+    br_sample_nplcp left_extension(uchar c, br_sample_nplcp const& prev_sample)
     {
         // replace c with internal representation
         c = remap[c];
 
-        br_sample sample(prev_sample);
+        br_sample_nplcp sample(prev_sample);
 
         // get SA range of cP
         sample.range = LF(prev_sample.range,c);
@@ -666,12 +666,12 @@ public:
      * 
      * assumes c is original char (not remapped)
      */
-    br_sample right_extension(uchar c, br_sample const& prev_sample)
+    br_sample_nplcp right_extension(uchar c, br_sample_nplcp const& prev_sample)
     {
         // replace c with internal representation
         c = remap[c];
 
-        br_sample sample(prev_sample);
+        br_sample_nplcp sample(prev_sample);
 
         // get SAR range of Pc
         sample.rangeR = LFR(prev_sample.rangeR,c);
@@ -738,9 +738,9 @@ public:
     /*
      * backward search P[left...right]
      */
-    br_sample backward_search(std::string const& pattern, ulint left, ulint right, br_sample const& sample)
+    br_sample_nplcp backward_search(std::string const& pattern, ulint left, ulint right, br_sample_nplcp const& sample)
     {
-        br_sample res(sample);
+        br_sample_nplcp res(sample);
         for (ulint i = right + 1; i-- > left; )
         {
             res = left_extension(pattern[i],res);
@@ -752,9 +752,9 @@ public:
     /*
      * forward search P[left...right]
      */
-    br_sample forward_search(std::string const& pattern, ulint left, ulint right, br_sample const& sample)
+    br_sample_nplcp forward_search(std::string const& pattern, ulint left, ulint right, br_sample_nplcp const& sample)
     {
-        br_sample res(sample);
+        br_sample_nplcp res(sample);
         for (ulint i = left; i <= right; ++i)
         {
             res = right_extension(pattern[i],res);
@@ -766,9 +766,19 @@ public:
     /*
      * count occurrences of current pattern P
      */
-    ulint count_sample(br_sample const& sample)
+    ulint count_sample(br_sample_nplcp const& sample)
     {
         return (sample.range.second + 1) - sample.range.first;
+    }
+
+    ulint count_samples(std::unordered_map<range_t,br_sample_nplcp,range_hash> const& samples)
+    {
+        ulint res = 0;
+		for (auto it = samples.begin(); it != samples.end(); ++it)
+		{
+			res += count_sample(it->second);
+		}
+		return res;
     }
 
     /*
@@ -776,7 +786,7 @@ public:
      * return them as std::vector
      * (space consuming if result is big)
      */
-    std::vector<ulint> locate_sample(br_sample const& sample)
+    std::vector<ulint> locate_sample(br_sample_nplcp const& sample)
     {
         assert(sample.j >= sample.d);
 
@@ -813,7 +823,7 @@ public:
         return res;
     }
 
-    std::vector<ulint> locate_samples(std::vector<br_sample> const& samples)
+    std::vector<ulint> locate_samples(std::vector<br_sample_nplcp> const& samples)
     {
         std::vector<ulint> res;
 		for (auto s: samples)
@@ -824,7 +834,7 @@ public:
 		return res;
     }
 
-    std::vector<ulint> locate_samples(std::unordered_map<range_t,br_sample,range_hash> const& samples)
+    std::vector<ulint> locate_samples(std::unordered_map<range_t,br_sample_nplcp,range_hash> const& samples)
     {
         std::vector<ulint> res;
 		for (auto it = samples.begin(); it != samples.end(); ++it)
@@ -842,7 +852,7 @@ public:
     {
         if (right) 
         {
-            br_sample sample(get_initial_sample(true));
+            br_sample_nplcp sample(get_initial_sample(true));
             for (size_t i = 0; i < pattern.size(); ++i)
             {
                 sample = right_only(pattern[i],sample);
@@ -852,7 +862,7 @@ public:
         }
         else 
         {
-            br_sample sample(get_initial_sample());
+            br_sample_nplcp sample(get_initial_sample());
             for (size_t i = 0; i < pattern.size(); ++i)
             {
                 sample = left_only(pattern[pattern.size()-1-i],sample);
@@ -862,15 +872,15 @@ public:
         }
     }
 
-    std::unordered_map<range_t,br_sample,range_hash> search_with_mismatch(std::string const& pattern, ulint allowed_mis=0)
+    std::unordered_map<range_t,br_sample_nplcp,range_hash> search_with_mismatch(std::string const& pattern, ulint allowed_mis=0)
     {
-        std::unordered_map<range_t,br_sample,range_hash> res;
+        std::unordered_map<range_t,br_sample_nplcp,range_hash> res;
         ulint m = pattern.size();
-        br_sample init_sample(get_initial_sample());
+        br_sample_nplcp init_sample(get_initial_sample());
 
         if (allowed_mis == 0)
         {
-            br_sample sample(backward_search(pattern,0,m-1,init_sample));
+            br_sample_nplcp sample(backward_search(pattern,0,m-1,init_sample));
             if (sample.is_invalid()) return res;
             res[sample.range] = sample;
             return res;
@@ -880,7 +890,7 @@ public:
         // divide pattern into div parts and search each part in advance
         for (ulint part = 0; part < div; ++part)
         {
-            br_sample sample(backward_search(pattern,(part*m)/div,((part+1)*m)/div-1,init_sample));
+            br_sample_nplcp sample(backward_search(pattern,(part*m)/div,((part+1)*m)/div-1,init_sample));
             if (sample.is_invalid()) continue;
             if (part==div-1) 
             {
@@ -894,14 +904,14 @@ public:
         return res;
     }
 
-    std::unordered_map<range_t,br_sample,range_hash> seed_and_extend(std::string const& pattern, ulint m1, ulint m2, ulint allowed_mis=0)
+    std::unordered_map<range_t,br_sample_nplcp,range_hash> seed_and_extend(std::string const& pattern, ulint m1, ulint m2, ulint allowed_mis=0)
     {
         // P[0,m1-1], P[m1,m2-1], P[m2,m-1]
-        std::unordered_map<range_t,br_sample,range_hash> res;
+        std::unordered_map<range_t,br_sample_nplcp,range_hash> res;
         ulint m = pattern.size();
-        br_sample init_sample(get_initial_sample());
+        br_sample_nplcp init_sample(get_initial_sample());
 
-        br_sample sample(backward_search(pattern,m1,m2-1,init_sample));
+        br_sample_nplcp sample(backward_search(pattern,m1,m2-1,init_sample));
         if (sample.is_invalid()) return res;
 
         forward_dfs(res,pattern,m,allowed_mis,m1,m2,0,sample);
@@ -909,8 +919,8 @@ public:
         return res;
     }
 
-    void backward_dfs(std::unordered_map<range_t,br_sample,range_hash>& res, std::string const& pattern,
-                    ulint m, ulint allowed_mis, ulint left_pos, ulint right_pos, ulint mis, br_sample prev_sample)
+    void backward_dfs(std::unordered_map<range_t,br_sample_nplcp,range_hash>& res, std::string const& pattern,
+                    ulint m, ulint allowed_mis, ulint left_pos, ulint right_pos, ulint mis, br_sample_nplcp prev_sample)
     {
         uchar c = remap[pattern[left_pos]];
 
@@ -920,7 +930,7 @@ public:
         {
             ulint acc = 0;
 
-            br_sample sample(prev_sample);
+            br_sample_nplcp sample(prev_sample);
 
             sample.range = LF(prev_sample.range,c);
             if (sample.is_invalid()) return;
@@ -973,7 +983,7 @@ public:
         
             for (ulint a = 1; a < sigma+1; ++a)
             {
-                br_sample sample(prev_sample);
+                br_sample_nplcp sample(prev_sample);
 
                 sample.range = LF(prev_sample.range,(uchar)a);
                 if (sample.is_invalid()) continue;
@@ -1037,8 +1047,8 @@ public:
         }   
     }
 
-    void forward_dfs(std::unordered_map<range_t,br_sample,range_hash>& res, std::string const& pattern,
-                    ulint m, ulint allowed_mis, ulint left_pos, ulint right_pos, ulint mis, br_sample prev_sample)
+    void forward_dfs(std::unordered_map<range_t,br_sample_nplcp,range_hash>& res, std::string const& pattern,
+                    ulint m, ulint allowed_mis, ulint left_pos, ulint right_pos, ulint mis, br_sample_nplcp prev_sample)
     {
         uchar c = remap[pattern[right_pos]];
 
@@ -1046,7 +1056,7 @@ public:
         {
             ulint acc = 0;
 
-            br_sample sample(prev_sample);
+            br_sample_nplcp sample(prev_sample);
 
             sample.rangeR = LFR(prev_sample.rangeR,c);
             if (sample.is_invalid()) return;
@@ -1101,7 +1111,7 @@ public:
         
             for (ulint a = 1; a < sigma+1; ++a)
             {
-                br_sample sample(prev_sample);
+                br_sample_nplcp sample(prev_sample);
 
                 sample.rangeR = LFR(prev_sample.rangeR,(uchar)a);
                 if (sample.is_invalid()) continue;
@@ -1177,7 +1187,7 @@ public:
     {
         if (right) 
         {
-            br_sample sample(get_initial_sample(true));
+            br_sample_nplcp sample(get_initial_sample(true));
             for (size_t i = 0; i < pattern.size(); ++i)
             {
                 sample = right_only(pattern[i],sample);
@@ -1187,7 +1197,7 @@ public:
         }
         else 
         {
-            br_sample sample(get_initial_sample());
+            br_sample_nplcp sample(get_initial_sample());
             for (size_t i = 0; i < pattern.size(); ++i)
             {
                 sample = left_only(pattern[pattern.size()-1-i],sample);
@@ -1329,12 +1339,12 @@ public:
     }
 
     /*
-     * save index to "{path_prefix}.bri" file
+     * save index to "{path_prefix}.brin" file
      */
     void save_to_file(std::string const& path_prefix)
     {
 
-        std::string path = path_prefix + ".brif";
+        std::string path = path_prefix + ".brin";
         
         std::ofstream out(path);
         serialize(out);
@@ -1488,12 +1498,12 @@ private:
      * assumes sample is SA[r] if range is [l,r]
      * assumes c is original char (not remapped)
      */
-    br_sample left_only(uchar c, br_sample const& prev_sample)
+    br_sample_nplcp left_only(uchar c, br_sample_nplcp const& prev_sample)
     {
         // replace c with internal representation
         c = remap[c];
 
-        br_sample sample(prev_sample);
+        br_sample_nplcp sample(prev_sample);
 
         // get SA range of cP
         sample.range = LF(prev_sample.range,c);
@@ -1526,12 +1536,12 @@ private:
      * assumes sample is SAR[e] if range is [s,e]
      * assumes c is original char (not remapped)
      */
-    br_sample right_only(uchar c, br_sample const& prev_sample)
+    br_sample_nplcp right_only(uchar c, br_sample_nplcp const& prev_sample)
     {
         // replace c with internal representation
         c = remap[c];
 
-        br_sample sample(prev_sample);
+        br_sample_nplcp sample(prev_sample);
 
         // get SAR range of Pc
         sample.rangeR = LFR(prev_sample.rangeR,c);
@@ -1556,9 +1566,9 @@ private:
      * backward search P[left...right]
      * range for SAR is not updated
      */
-    br_sample backward_only(std::string const& pattern, ulint left, ulint right, br_sample const& sample)
+    br_sample_nplcp backward_only(std::string const& pattern, ulint left, ulint right, br_sample_nplcp const& sample)
     {
-        br_sample res(sample);
+        br_sample_nplcp res(sample);
         for (ulint i = right + 1; i-- > left; )
         {
             res = left_only(pattern[i],res);
@@ -1571,9 +1581,9 @@ private:
      * forward search P[left...right]
      * range for SA is not updated
      */
-    br_sample forward_only(std::string const& pattern, ulint left, ulint right, br_sample const& sample)
+    br_sample_nplcp forward_only(std::string const& pattern, ulint left, ulint right, br_sample_nplcp const& sample)
     {
-        br_sample res(sample);
+        br_sample_nplcp res(sample);
         for (ulint i = left; i <= right; ++i)
         {
             res = right_only(pattern[i],res);
@@ -1589,7 +1599,7 @@ private:
      * return them as std::vector
      * (space consuming if result is big)
      */
-    std::vector<ulint> locate_sample_backward(br_sample const& sample)
+    std::vector<ulint> locate_sample_backward(br_sample_nplcp const& sample)
     {
         ulint sa = sample.j - sample.d;
         ulint n_occ = sample.range.second + 1 - sample.range.first;
@@ -1734,4 +1744,4 @@ private:
 
 };
 
-#endif /* INCLUDED_BR_INDEX_HPP */
+#endif /* INCLUDED_BR_INDEX_NPLCP_HPP */

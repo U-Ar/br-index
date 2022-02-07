@@ -711,6 +711,16 @@ public:
         return (sample.range.second + 1) - sample.range.first;
     }
 
+    ulint count_samples(std::unordered_map<range_t,br_sample,range_hash> const& samples)
+    {
+        ulint res = 0;
+		for (auto it = samples.begin(); it != samples.end(); ++it)
+		{
+			res += count_sample(it->second);
+		}
+		return res;
+    }
+
     /*
      * locate occurrences of current pattern P
      * return them as std::vector

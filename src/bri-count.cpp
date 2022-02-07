@@ -2,12 +2,14 @@
 #include <chrono>
 
 #include "br_index.hpp"
+#include "br_index_nplcp.hpp"
 #include "utils.hpp"
 
 using namespace bri;
 using namespace std;
 
 long allowed = 0;
+bool nplcp = false;
 
 void help()
 {
@@ -15,6 +17,7 @@ void help()
     cout << "            allowing some mismatched characters."                 << endl << endl;
 
 	cout << "Usage: bri-count [options] <index> <patterns>" << endl;
+    cout << "   -nplcp       use the version without PLCP."<<endl;
     cout << "   -m <number>  number of mismatched characters allowed (0 by default)" << endl;
 	cout << "   <index>      index file (with extension .bri)" << endl;
 	cout << "   <patterns>   file in pizza&chili format containing the patterns." << endl;
@@ -28,7 +31,8 @@ void parse_args(char** argv, int argc, int &ptr){
 	string s(argv[ptr]);
 	ptr++;
 
-    if(s.compare("-m")==0){
+    if(s.compare("-m") == 0) 
+    {
 
         if(ptr>=argc-1){
             cout << "Error: missing parameter after -m option." << endl;
@@ -45,7 +49,15 @@ void parse_args(char** argv, int argc, int &ptr){
 
         ptr++;
 
-	}else{
+	} 
+    else if (s.compare("-nplcp") == 0)
+    {
+
+        nplcp = true;
+
+    }
+    else 
+    {
 
         cout << "Error: unknown option " << s << endl;
         help();
@@ -53,7 +65,7 @@ void parse_args(char** argv, int argc, int &ptr){
     }
 }
 
-
+template<class T>
 void count_all(ifstream& in, string patterns)
 {
     using std::chrono::high_resolution_clock;
@@ -67,7 +79,7 @@ void count_all(ifstream& in, string patterns)
 
     auto t1 = high_resolution_clock::now();
 
-    br_index<> idx;
+    T idx;
 
     idx.load(in);
 
@@ -108,7 +120,8 @@ void count_all(ifstream& in, string patterns)
             p += c;
         }
 
-        occ_tot += idx.count_with_mismatch(p,allowed);
+        auto samples = idx.search_with_mismatch(p,allowed);
+        occ_tot += idx.count_samples(samples);
 
     }
 
@@ -149,7 +162,11 @@ int main(int argc, char** argv)
     ifstream in(idx_file);
 
     cout << "Loading br-index" << endl;
-    count_all(in, patt_file);
+
+    if (nplcp)
+        count_all<br_index_nplcp<> >(in, patt_file);
+    else 
+        count_all<br_index<> >(in, patt_file);
 
     in.close();
 

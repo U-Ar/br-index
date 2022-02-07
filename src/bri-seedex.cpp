@@ -2,7 +2,8 @@
 #include <chrono>
 #include <cstdlib>
 
-#include "br_index_fast.hpp"
+#include "br_index.hpp"
+#include "br_index_nplcp.hpp"
 #include "utils.hpp"
 
 using namespace bri;
@@ -10,17 +11,19 @@ using namespace std;
 
 string check = string();
 long allowed = 0;
+bool nplcp = false;
 size_t left_len = 0;
 size_t core_len = 0;
 
 void help()
 {
-	cout << "brif-seed: locate all occurrences of the input patterns" << endl;
+	cout << "bri-seedex: locate all occurrences of the input patterns" << endl;
     cout << "             with exact core and some mismatched characters."        << endl << endl;
 
-	cout << "Usage: brif-seed [options] <index> <patterns> <left> <core>" << endl;
+	cout << "Usage: bri-seedex [options] <index> <patterns>" << endl;
+    cout << "   -nplcp       use the version without PLCP." << endl;
     cout << "   -m <number>  max number of mismatched characters allowed (0 by default)" << endl;
-    cout << "   -c <text>    check correctness of each pattern occurrence on this text file (must be the same indexed)" << endl;
+	cout << "   -c <text>    check correctness of each pattern occurrence on this text file (must be the same indexed)" << endl;
 	cout << "   <index>      index file (with extension .bri)" << endl;
 	cout << "   <patterns>   file in pizza&chili format containing the patterns." << endl;
     cout << "   <left>       length of the left region" << endl;
@@ -36,7 +39,8 @@ void parse_args(char** argv, int argc, int &ptr){
 	string s(argv[ptr]);
 	ptr++;
 
-	if(s.compare("-c")==0){
+	if (s.compare("-c") == 0) 
+    {
 
 		if(ptr>=argc-1){
 			cout << "Error: missing parameter after -c option." << endl;
@@ -46,7 +50,9 @@ void parse_args(char** argv, int argc, int &ptr){
 		check = string(argv[ptr]);
 		ptr++;
     
-    }else if(s.compare("-m")==0){
+    }
+    else if (s.compare("-m") == 0)
+    {
 
         if(ptr>=argc-1){
             cout << "Error: missing parameter after -m option." << endl;
@@ -63,7 +69,15 @@ void parse_args(char** argv, int argc, int &ptr){
 
         ptr++;
 
-	}else{
+	}
+    else if (s.compare("-nplcp") == 0)
+    {
+
+        nplcp = true;
+
+    }
+    else
+    {
 
 		cout << "Error: unknown option " << s << endl;
 		help();
@@ -72,7 +86,7 @@ void parse_args(char** argv, int argc, int &ptr){
 
 }
 
-
+template<class T>
 void locate_all(ifstream& in, string patterns)
 {
     using std::chrono::high_resolution_clock;
@@ -96,7 +110,7 @@ void locate_all(ifstream& in, string patterns)
 
     auto t1 = high_resolution_clock::now();
 
-    br_index_fast<> idx;
+    T idx;
 
     idx.load(in);
 
@@ -151,14 +165,6 @@ void locate_all(ifstream& in, string patterns)
         auto samples = idx.seed_and_extend(p,m1,m2,allowed);
         t4 = high_resolution_clock::now();
         auto occs = idx.locate_samples(samples);
-        //ulint tmp = 0;
-        //for (auto s: samples) tmp += s.second.size();
-        //cout << "occ num: "<< tmp << endl;
-        //auto occs = idx.locate(p);
-        //auto occs1 = idx.locate1(p);
-        //auto occs2 = idx.locate2(p);
-        //occs.insert(occs.end(),occs1.begin(),occs1.end());
-        //occs.insert(occs.end(),occs2.begin(),occs2.end());
         t5 = high_resolution_clock::now();
 
         count_time += duration_cast<microseconds>(t4-t3).count();
@@ -236,7 +242,6 @@ int main(int argc, char** argv)
     string idx_file(argv[ptr]);
     string patt_file(argv[ptr+1]);
 
-
     char* e;
         
     left_len = strtol(argv[ptr+2],&e,10);
@@ -256,7 +261,11 @@ int main(int argc, char** argv)
     ifstream in(idx_file);
 
     cout << "Loading br-index" << endl;
-    locate_all(in, patt_file);
+
+    if (nplcp)
+        locate_all<br_index_nplcp<> >(in, patt_file);
+    else 
+        locate_all<br_index<> >(in, patt_file);
 
     in.close();
 

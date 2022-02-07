@@ -3,6 +3,7 @@
 #include <cstdlib>
 
 #include "br_index.hpp"
+#include "br_index_nplcp.hpp"
 #include "utils.hpp"
 
 using namespace bri;
@@ -10,6 +11,7 @@ using namespace std;
 
 string check = string();
 long allowed = 0;
+bool nplcp = false;
 
 void help()
 {
@@ -17,7 +19,8 @@ void help()
     cout << "             allowing some mismatched characters."        << endl << endl;
 
 	cout << "Usage: bri-locate [options] <index> <patterns>" << endl;
-    cout << "   -m <number>  max number of mismatched characters allowed (supported: 0,1,2 (0 by default))" << endl;
+    cout << "   -nplcp       use the version without PLCP." << endl;
+    cout << "   -m <number>  max number of mismatched characters allowed (0 by default)" << endl;
 	cout << "   -c <text>    check correctness of each pattern occurrence on this text file (must be the same indexed)" << endl;
 	cout << "   <index>      index file (with extension .bri)" << endl;
 	cout << "   <patterns>   file in pizza&chili format containing the patterns." << endl;
@@ -31,7 +34,8 @@ void parse_args(char** argv, int argc, int &ptr){
 	string s(argv[ptr]);
 	ptr++;
 
-	if(s.compare("-c")==0){
+	if (s.compare("-c") == 0) 
+    {
 
 		if(ptr>=argc-1){
 			cout << "Error: missing parameter after -c option." << endl;
@@ -41,7 +45,9 @@ void parse_args(char** argv, int argc, int &ptr){
 		check = string(argv[ptr]);
 		ptr++;
     
-    }else if(s.compare("-m")==0){
+    }
+    else if (s.compare("-m") == 0)
+    {
 
         if(ptr>=argc-1){
             cout << "Error: missing parameter after -m option." << endl;
@@ -58,7 +64,15 @@ void parse_args(char** argv, int argc, int &ptr){
 
         ptr++;
 
-	}else{
+	}
+    else if (s.compare("-nplcp") == 0)
+    {
+
+        nplcp = true;
+
+    }
+    else
+    {
 
 		cout << "Error: unknown option " << s << endl;
 		help();
@@ -67,7 +81,7 @@ void parse_args(char** argv, int argc, int &ptr){
 
 }
 
-
+template<class T>
 void locate_all(ifstream& in, string patterns)
 {
     using std::chrono::high_resolution_clock;
@@ -91,7 +105,7 @@ void locate_all(ifstream& in, string patterns)
 
     auto t1 = high_resolution_clock::now();
 
-    br_index<> idx;
+    T idx;
 
     idx.load(in);
 
@@ -209,7 +223,11 @@ int main(int argc, char** argv)
     ifstream in(idx_file);
 
     cout << "Loading br-index" << endl;
-    locate_all(in, patt_file);
+
+    if (nplcp)
+        locate_all<br_index_nplcp<> >(in, patt_file);
+    else 
+        locate_all<br_index<> >(in, patt_file);
 
     in.close();
 
