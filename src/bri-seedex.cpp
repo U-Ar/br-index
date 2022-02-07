@@ -12,18 +12,23 @@ using namespace std;
 string check = string();
 long allowed = 0;
 bool nplcp = false;
+size_t left_len = 0;
+size_t core_len = 0;
 
 void help()
 {
-	cout << "bri-locate: locate all occurrences of the input patterns" << endl;
-    cout << "             allowing some mismatched characters."        << endl << endl;
+	cout << "bri-seedex: locate all occurrences of the input patterns" << endl;
+    cout << "             with exact core and some mismatched characters."        << endl << endl;
 
-	cout << "Usage: bri-locate [options] <index> <patterns>" << endl;
+	cout << "Usage: bri-seedex [options] <index> <patterns>" << endl;
     cout << "   -nplcp       use the version without PLCP." << endl;
     cout << "   -m <number>  max number of mismatched characters allowed (0 by default)" << endl;
 	cout << "   -c <text>    check correctness of each pattern occurrence on this text file (must be the same indexed)" << endl;
 	cout << "   <index>      index file (with extension .bri)" << endl;
 	cout << "   <patterns>   file in pizza&chili format containing the patterns." << endl;
+    cout << "   <left>       length of the left region" << endl;
+    cout << "   <core>       length of the core exact region" << endl;
+
 	exit(0);
 }
 
@@ -153,8 +158,11 @@ void locate_all(ifstream& in, string patterns)
             p += c;
         }
 
+        size_t m1 = left_len;
+        size_t m2 = left_len + core_len;
+
         t3 = high_resolution_clock::now();
-        auto samples = idx.search_with_mismatch(p,allowed);
+        auto samples = idx.seed_and_extend(p,m1,m2,allowed);
         t4 = high_resolution_clock::now();
         auto occs = idx.locate_samples(samples);
         t5 = high_resolution_clock::now();
@@ -168,10 +176,15 @@ void locate_all(ifstream& in, string patterns)
         if (c) // check occurrences
         {
             cout << "number of occs with at most " << allowed << " mismatch   : " << occs.size() << endl;
+            //cout << "the original pattern: " << p << endl;
+            for (auto s : samples)
+            {
+                cout << s.second.range.first << " " << s.second.range.second << " " << s.second.j << " " << s.second.len << endl;
+            }
             for (auto o : occs)
             {
                 int mismatches = 0;
-                for (size_t i = 0; i < p.size(); ++i)
+                for (size_t i = 0; i < m; ++i)
                 {
                     if (text[o+i] != p[i]) mismatches++;
                 }
@@ -180,6 +193,15 @@ void locate_all(ifstream& in, string patterns)
                     cout << "Error: wrong occurrence:  " << o << endl;
                     cout << "       original pattern:  " << p << endl;
                     cout << "       wrong    pattern:  " << text.substr(o,p.size()) << endl;
+                }
+                for (ulint k = m1; k < m2; ++k)
+                {
+                    if (text[o+k] != p[k]) 
+                    {
+                        cout << "Error: wrong occurrence:  " << o << endl;
+                        cout << "       original pattern:  " << p << endl;
+                        cout << "       wrong    pattern:  " << text.substr(o,p.size()) << endl;
+                    }
                 }
             }
         }
@@ -196,15 +218,15 @@ void locate_all(ifstream& in, string patterns)
     ulint load = duration_cast<milliseconds>(t2-t1).count();
     cout << "Load time  : " << load << " milliseconds" << endl;
 
-    cout << "Number of patterns             n = " << n << endl;
-	cout << "Pattern length                 m = " << m << endl;
-	cout << "Total number of occurrences  occ = " << occ_tot << endl << endl;
+    cout << "Number of patterns n = " << n << endl;
+	cout << "Pattern length     m = " << m << endl;
+	cout << "Total number of occurrences   occt = " << occ_tot << endl << endl;
 
     cout << "LF-mapping time: " << count_time << " microseconds" << endl;
     cout << "Phi        time: " << locate_time << " microseconds" << endl;
-    cout << "Total time     : " << tot_time << " microseconds" << endl;
-	cout << "Search time    : " << (double)tot_time/n << " microseconds/pattern (total: " << n << " patterns)" << endl;
-	cout << "Search time    : " << (double)tot_time/occ_tot << " microseconds/occurrence (total: " << occ_tot << " occurrences)" << endl;
+    cout << "Total time : " << tot_time << " microseconds" << endl;
+	cout << "Search time: " << (double)tot_time/n << " microseconds/pattern (total: " << n << " patterns)" << endl;
+	cout << "Search time: " << (double)tot_time/occ_tot << " microseconds/occurrence (total: " << occ_tot << " occurrences)" << endl;
 }
 
 
@@ -215,10 +237,26 @@ int main(int argc, char** argv)
 
     int ptr = 1;
 
-    while (ptr < argc - 2) parse_args(argv, argc, ptr);
+    while (ptr < argc - 4) parse_args(argv, argc, ptr);
 
     string idx_file(argv[ptr]);
     string patt_file(argv[ptr+1]);
+
+    char* e;
+        
+    left_len = strtol(argv[ptr+2],&e,10);
+
+    if(*e != '\0'){
+        cout << "Error: invalid value for <left>" << endl;
+        help();
+    }
+
+    core_len = strtol(argv[ptr+3],&e,10);
+
+    if(*e != '\0'){
+        cout << "Error: invalid value for <core>" << endl;
+        help();
+    }
 
     ifstream in(idx_file);
 
