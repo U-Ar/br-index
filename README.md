@@ -39,7 +39,7 @@ make
 	<dd>Builds the br-index on the input text file.</dd>
 	<dt>bri-locate</dt>
 	<dd>Locates the occurrences of the given pattern using the index. Provide a pattern file in 
-	the <a href="https://pizzachili.dcc.uchile.cl/experiments.html">Pizza&Chili format</a>. You can give an option "-m (number)" for the number of mismatched characters allowed (0 by default).</dd>
+	the <a href="http://pizzachili.dcc.uchile.cl/experiments.html">Pizza&Chili format</a>. You can give an option "-m (number)" for the number of mismatched characters allowed (0 by default).</dd>
 	<dt>bri-count</dt>
 	<dd>Counts the number of the occurrences of the given pattern using the index. Its usage is same as bri-locate.</dd>
 	<dt>bri-seedex</dt>
