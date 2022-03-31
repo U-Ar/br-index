@@ -59,7 +59,7 @@ make test-bri
 
 <dl>
 	<dt>br_index.hpp (default)</dt>
-	<dd>The simple implementation of br-index. Only the variables necessary for locate <i>(j,d,len)</i> are maintained, which are sufficient to compute <i>locate.</i></dd>
+	<dd>The simple implementation of br-index used in the experiments. Only the variables necessary for locate <i>(j,d,len)</i> are maintained, which are sufficient to compute <i>locate.</i></dd>
 	<dt>br_index_nplcp.hpp</dt>
 	<dd>The implementation without PLCP. <i>(p,j,d,len)</i> are maintained. It computes <i>locate</i> by calculating <i>p'=LF^d(p)</i> and comparing <i>p'</i> with
 	[<i>s, e</i>]. Larger than the normal one while computing <i>locate</i> is faster when occ is large compared to |P|.
