@@ -65,7 +65,7 @@ make test-bri
 
 ## Citation
 
-Please cite the following:
+Cite the following paper:
 - Arakawa, Y., Navarro, G., & Sadakane, K. (2022). Bi-Directional r-Indexes. In 33rd Annual Symposium on Combinatorial Pattern Matching (CPM 2022). Schloss Dagstuhl-Leibniz-Zentrum für Informatik.
 
 It is more desirable to cite the following, which are the original papers of the r-index:
