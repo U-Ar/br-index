@@ -7,10 +7,6 @@ This repository provides the __bi-directional__ r-index (_br-index_).
 The r-index is the compressed text index which supports efficient count(P) and locate(P).
 Its uses O(r) words of space, whose r is the number of equal-letter runs in BWT of the text.
 
-The r-index was originally proposed in the following papers:
-- Gagie, T., Navarro, G., & Prezza, N. (2018). Optimal-time text indexing in BWT-runs bounded space. In Proceedings of the Twenty-Ninth Annual ACM-SIAM Symposium on Discrete Algorithms (pp. 1459-1477). Society for Industrial and Applied Mathematics.
-- Gagie, T., Navarro, G., & Prezza, N. (2020). Fully functional suffix trees and optimal text searching in BWT-runs bounded space. Journal of the ACM (JACM), 67(1), 1-54.
-
 The br-index we have proposed is achieved by using the mechanism of the r-index but adding new structures. It allows for bi-directional extension of patterns, _left-extension_ and _right-extension_. Also, you can locate all the occurrences of the current pattern at any step of the search.
 
 ## System Requirements
@@ -66,3 +62,12 @@ make test-bri
 	<dt>br_index_naive.hpp (old)</dt>
 	<dd>The naive implementation of br-index. All the variables <i>p,j,d,pR,jR,dR,len</i> are maintained during the search. Not space-efficient, implemented mainly for the educational purpose and the possible future use. (It's not updated now, so it doesn't function)</dd>
 </dl>
+
+## Citation
+
+Please cite the following:
+- Arakawa, Y., Navarro, G., & Sadakane, K. (2022). Bi-Directional r-Indexes. In 33rd Annual Symposium on Combinatorial Pattern Matching (CPM 2022). Schloss Dagstuhl-Leibniz-Zentrum für Informatik.
+
+It is more desirable to cite the following, which are the original papers of the r-index:
+- Gagie, T., Navarro, G., & Prezza, N. (2018). Optimal-time text indexing in BWT-runs bounded space. In Proceedings of the Twenty-Ninth Annual ACM-SIAM Symposium on Discrete Algorithms (pp. 1459-1477). Society for Industrial and Applied Mathematics.
+- Gagie, T., Navarro, G., & Prezza, N. (2020). Fully functional suffix trees and optimal text searching in BWT-runs bounded space. Journal of the ACM (JACM), 67(1), 1-54.
