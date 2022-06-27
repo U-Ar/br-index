@@ -68,6 +68,6 @@ make test-bri
 Cite the following paper:
 - Arakawa, Y., Navarro, G., & Sadakane, K. (2022). Bi-Directional r-Indexes. In 33rd Annual Symposium on Combinatorial Pattern Matching (CPM 2022). Schloss Dagstuhl-Leibniz-Zentrum für Informatik.
 
-It is more desirable to cite the following, which are the original papers of the r-index:
+It is more desirable to cite the following papers in addition, which are the original papers of the r-index:
 - Gagie, T., Navarro, G., & Prezza, N. (2018). Optimal-time text indexing in BWT-runs bounded space. In Proceedings of the Twenty-Ninth Annual ACM-SIAM Symposium on Discrete Algorithms (pp. 1459-1477). Society for Industrial and Applied Mathematics.
 - Gagie, T., Navarro, G., & Prezza, N. (2020). Fully functional suffix trees and optimal text searching in BWT-runs bounded space. Journal of the ACM (JACM), 67(1), 1-54.
