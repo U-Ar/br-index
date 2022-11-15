@@ -1,5 +1,15 @@
 # br-index
 
+## News
+
+The refined version is here: https://github.com/U-Ar/full-br-index
+
+New features:
+
+- **Fast and space-efficient index construction** using Prefix-Free Parsing.
+- Pattern **contraction** operations (_left-contraction_, _right-contraction_)
+- Integration tests
+
 ## About
 
 This repository provides the __bi-directional__ r-index (_br-index_).
