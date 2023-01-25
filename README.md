@@ -2,7 +2,7 @@
 
 ## News
 
-The refined version is here: https://github.com/U-Ar/full-br-index
+A refined version is here: https://github.com/U-Ar/full-br-index
 
 New features:
 
